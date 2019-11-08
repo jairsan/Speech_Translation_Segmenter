@@ -1,6 +1,7 @@
 import torch
 import torch.utils.data as data
 import os
+import torch.nn as nn
 
 
 class segmentationBinarizedDataset(data.Dataset):
@@ -31,5 +32,18 @@ class segmentationBinarizedDataset(data.Dataset):
 
     def __getitem__(self, idx):
         # Returns a tuple. Element 0 is the Tensor of indices. Element 1 is the target
-        print(self.samples[idx])
         return self.samples[idx]
+
+
+def collateBinarizedBatch(batch):
+    """
+    Returns a padded sequence
+    """
+    xs = [item[0] for item in batch]
+    ys = [item[1] for item in batch]
+    src_lengths = [len(x) for x in xs]
+
+    X = nn.utils.rnn.pad_sequence(xs,batch_first=True)
+    Y = torch.IntTensor(ys)
+
+    return X, src_lengths, Y

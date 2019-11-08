@@ -1,7 +1,14 @@
 class VocabDictionary:
-    def __init__(self, unk=1):
+    def __init__(self, unk="<unk>", pad="<pad>"):
         self.dictionary = {}
+        self.tokens = []
         self.unk = unk
+        self.pad = pad
+        self.pad_index = self.add_symbol(self.pad)
+        self.unk_index = self.add_symbol(self.unk)
+
+    def __len__(self):
+        return len(self.dictionary)
 
     def load_from_index_file(self, path):
         """
@@ -11,13 +18,22 @@ class VocabDictionary:
         <symbolN> <indexN>
         TODO: Test this method
         """
-
+        raise Exception
         with open(path, encoding="utf-8") as f:
             for line in f:
                 symbol, index = line.strip().split()
                 self.dictionary[symbol] = int(index)
 
-    def load_from_count_file(self, path, max_size=None):
+    def add_symbol(self,symbol):
+        index = len(self.tokens)
+        if symbol not in self.tokens:
+            self.tokens.append(symbol)
+            self.dictionary[symbol] = index
+            return index
+        else:
+            return self.dictionary[symbol]
+
+    def create_from_count_file(self, path, max_size=None):
         """
         Loads the dictionary from a file containing a list of counts
         <symbol0> <count0>
@@ -36,10 +52,8 @@ class VocabDictionary:
 
             symbols_and_counts_tuple_list = symbols_and_counts_tuple_list[:max_size]
 
-        i = 1
         for symbol, _ in symbols_and_counts_tuple_list:
-            self.dictionary[symbol] = i
-            i += 1
+            self.add_symbol(symbol)
 
     def get_index(self, token):
-        return self.dictionary.get(token, self.unk)
+        return self.dictionary.get(token, self.unk_index)
