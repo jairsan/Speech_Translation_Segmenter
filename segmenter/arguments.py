@@ -3,6 +3,7 @@ def add_train_arguments(parser):
     parser.add_argument("--train_corpus", type=str, help="Folder containing paired training images")
     parser.add_argument("--vocabulary", type=str, help="Folder containing paired training images")
     parser.add_argument("--epochs", type=int, help="Train the model this number of epochs")
+    parser.add_argument("--batch_size", type=int, help="Train batch size")
 
 
 def add_model_arguments(parser):

@@ -44,6 +44,6 @@ def collateBinarizedBatch(batch):
     src_lengths = [len(x) for x in xs]
 
     X = nn.utils.rnn.pad_sequence(xs,batch_first=True)
-    Y = torch.IntTensor(ys)
+    Y = torch.LongTensor(ys)
 
     return X, src_lengths, Y
