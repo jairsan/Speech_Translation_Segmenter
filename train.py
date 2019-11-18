@@ -12,16 +12,7 @@ from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_supp
 
 
 
-def get_sentence_prediction(model_output,lengths, device):
-    select = lengths - torch.ones(lengths.shape, dtype=torch.long)
 
-    select = select.to(device)
-
-    indices = torch.unsqueeze(select, 1)
-    indices = torch.unsqueeze(indices, 2).repeat(1, 1, 2)
-    results = torch.gather(model_output, 1, indices).squeeze(1)
-
-    return results
 
 if __name__ == "__main__":
     start_prep = time.time()
@@ -66,7 +57,7 @@ if __name__ == "__main__":
             x, y = x.to(device), y.to(device)
             model_output,lengths, hn = model.forward(x, src_lengths)
 
-            results = get_sentence_prediction(model_output,lengths, device)
+            results = model.get_sentence_prediction(model_output,lengths, device)
 
             cost = loss(results, y)
             cost.backward()
@@ -88,7 +79,7 @@ if __name__ == "__main__":
                 x, y = x.to(device), y.to(device)
                 model_output, lengths, hn = model.forward(x, src_lengths)
 
-                results = get_sentence_prediction(model_output, lengths, device)
+                results = model.get_sentence_prediction(model_output, lengths, device)
                 yhat = torch.argmax(results,dim=1)
 
 
@@ -110,4 +101,4 @@ if __name__ == "__main__":
                 'version': "0.1",
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-            }, args.output_folder + "/model.last.pt")
+            }, args.output_folder + "/model.last.pt", pickle_protocol=4)

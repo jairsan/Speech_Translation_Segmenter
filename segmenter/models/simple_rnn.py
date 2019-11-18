@@ -24,3 +24,15 @@ class SimpleRNN(nn.Module):
         x, lengths = nn.utils.rnn.pad_packed_sequence(x, batch_first=True, padding_value=0.0)
         x = self.linear1(x)
         return x, lengths, hn
+
+
+    def get_sentence_prediction(self,model_output,lengths, device):
+        select = lengths - torch.ones(lengths.shape, dtype=torch.long)
+
+        select = select.to(device)
+
+        indices = torch.unsqueeze(select, 1)
+        indices = torch.unsqueeze(indices, 2).repeat(1, 1, 2)
+        results = torch.gather(model_output, 1, indices).squeeze(1)
+
+        return results

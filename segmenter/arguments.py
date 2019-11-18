@@ -11,13 +11,16 @@ def add_train_arguments(parser):
     parser.add_argument("--log_every", type=int, default=100, help="Log training statistics every n updates")
     parser.add_argument("--checkpoint_interval", type=int, default=1, help="Save model every n epochs")
 
-
-
-
 def add_model_arguments(parser):
     # Model parameters
     parser.add_argument("--rnn_layer_size", type=int, help="Hidden size of the RNN layers")
     parser.add_argument("--classifier_hidden_size", type=int, help="Size of the classifier layers")
     parser.add_argument("--embedding_size", type=int, help="Size of the embedding")
     parser.add_argument("--n_classes", type=int, help="Number of classification targets")
+
+
+def add_infer_arguments(parser):
+    parser.add_argument("--vocabulary", type=str, help="Vocabulary to be used by the network", required=True)
+    parser.add_argument("--model_path", type=str, help="Load this model", required=True)
+    parser.add_argument("--file", type=str, help="Infer from this sample file instead of a stream")
 
