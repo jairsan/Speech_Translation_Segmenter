@@ -28,13 +28,13 @@ def get_decision(model,sentence,vocab_dictionary):
     results = model.get_sentence_prediction(model_output, lengths, device)
 
     #In the future, we should compute probs if we want to carry out search
-    decision = torch.argmax(results,dim=1)
+    decision = torch.argmax(results,dim=1).detach().cpu().numpy().tolist()
 
 
     return decision
 
 
-def decode_from_sample_file(args, model):
+def decode_from_sample_file(args, model, vocabulary):
 
     with open(args.file) as f:
         for line in f:
@@ -43,32 +43,56 @@ def decode_from_sample_file(args, model):
             target = int(line[0])
             tokens = line[1:]
 
-            decision = get_decision(model, tokens, vocabulary)
+            decision = get_decision(model, tokens, vocabulary)[0]
 
-            decision = decision.detach().cpu().numpy().tolist()
-
-
-def decode_from_stream(args, model):
-
-    if args.stream != "sys.stdin":
-        text = []
-
-        with open(args.stream) as f:
-            for l in f:
-                l = l.strip().split()
-                text.extend(l)
-
-        max_len = 15
-        window_size = 4
-
-        history = ["</s>"] * (max_len - window_size - 1)
-
-        for i in range(len(text)-window_size):
+            print(decision)
 
 
-    else:
-        pass
+def decode_from_file(file_path, args, model, vocabulary):
 
+    text = []
+
+    with open(file_path) as f:
+        for l in f:
+            l = l.strip().split()
+            text.extend(l)
+
+    max_len = 15
+    window_size = 4
+
+    history = ["</s>"] * (max_len - window_size - 1)
+
+    buffer = []
+
+    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    for i in range(len(text)-window_size):
+        buffer.append(text[i])
+        sample = history + [text[i]] + text[i+1:i+window_size+1]
+        assert len(sample) == max_len
+
+        decision = get_decision(model,sample,vocabulary)[0]
+
+        if decision == 0:
+            history.pop(0)
+            history.append(text[i])
+        else:
+            history.pop(0)
+            history.pop(0)
+            history.append(text[i])
+            history.append("</s>")
+            print(" ".join(buffer))
+            buffer = []
+
+def decode_from_list_of_files(args, model, vocabulary):
+
+    with open(args.input_file_list) as f_lst:
+        for line in f_lst:
+            decode_from_file(line.strip(), args, model, vocabulary)
+
+
+#TODO: Complete. This should decode only from stdin or server port. This is the true online version
+def decode_from_stream(args, model, vocabulary):
+    pass
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -88,7 +112,9 @@ if __name__ == "__main__":
     model = SimpleRNN(args,vocabulary).to(device)
     model = load_model(args.model_path, model)
 
-    if args.file != None:
-        decode_from_sample_file(args, model)
+    if args.input_format == "sample_file":
+        decode_from_sample_file(args, model, vocabulary)
+    elif args.input_format == "list_of_text_files":
+        decode_from_list_of_files(args, model, vocabulary)
     else:
-        decode_from_stream(args,model)
+        decode_from_stream(args, model, vocabulary)

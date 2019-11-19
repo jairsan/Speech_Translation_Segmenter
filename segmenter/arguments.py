@@ -19,8 +19,13 @@ def add_model_arguments(parser):
     parser.add_argument("--n_classes", type=int, help="Number of classification targets")
 
 
+#TODO: Fix stream so that it only infer from stdin.
 def add_infer_arguments(parser):
     parser.add_argument("--vocabulary", type=str, help="Vocabulary to be used by the network", required=True)
     parser.add_argument("--model_path", type=str, help="Load this model", required=True)
-    parser.add_argument("--file", type=str, help="Infer from this sample file instead of a stream")
+    parser.add_argument("--input_format",  choices=['sample_file', 'stream', 'list_of_text_files'], help="Input format for the decoding process. ", required=True)
+    parser.add_argument("--file", type=str, help="Infer from this sample file")
+    parser.add_argument("--stream", type=str, help="Infer from this stream. By default, sys.stdin", default="sys.stdin")
+    parser.add_argument("--input_file_list", type=str, help="Infer from list of files.")
+
 
