@@ -5,6 +5,7 @@ import argparse
 from segmenter import dataset,arguments,vocab
 from segmenter.models.simple_rnn import SimpleRNN
 
+from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
 
 
 def load_model(path,model):
@@ -23,7 +24,7 @@ def get_decision(model,sentence,vocab_dictionary):
 
     x = torch.LongTensor([tokens_i])
     X = nn.utils.rnn.pad_sequence(x, batch_first=True)
-    model_output, lengths, hn = model.forward(X, [len(x)])
+    model_output, lengths, hn = model.forward(X, [len(tokens_i)])
 
     results = model.get_sentence_prediction(model_output, lengths, device)
 
@@ -35,7 +36,8 @@ def get_decision(model,sentence,vocab_dictionary):
 
 
 def decode_from_sample_file(args, model, vocabulary):
-
+    targets = []
+    decisions = []
     with open(args.file) as f:
         for line in f:
             line = line.strip().split()
@@ -45,7 +47,13 @@ def decode_from_sample_file(args, model, vocabulary):
 
             decision = get_decision(model, tokens, vocabulary)[0]
 
+            targets.append(target)
+            decisions.append(decision)
+
             print(decision)
+
+    print("Dev precision, Recall, F1 (Macro): ", precision_recall_fscore_support(targets, decisions, average='macro'))
+    print(classification_report(decisions, targets))
 
 
 def decode_from_file(file_path, args, model, vocabulary):
@@ -83,6 +91,7 @@ def decode_from_file(file_path, args, model, vocabulary):
             print(" ".join(buffer))
             buffer = []
 
+
 def decode_from_list_of_files(args, model, vocabulary):
 
     with open(args.input_file_list) as f_lst:
@@ -93,6 +102,7 @@ def decode_from_list_of_files(args, model, vocabulary):
 #TODO: Complete. This should decode only from stdin or server port. This is the true online version
 def decode_from_stream(args, model, vocabulary):
     pass
+
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
