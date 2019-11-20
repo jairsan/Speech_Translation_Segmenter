@@ -28,8 +28,16 @@ if __name__ == "__main__":
     vocabulary = vocab.VocabDictionary()
     vocabulary.create_from_count_file(args.vocabulary)
 
-    train_dataset = dataset.segmentationBinarizedDataset(args.train_corpus,vocabulary)
-    train_dataloader = data.DataLoader(train_dataset,num_workers=3,batch_size=args.batch_size,shuffle=True,drop_last=True,
+    train_dataset = dataset.segmentationBinarizedDataset(args.train_corpus,vocabulary,args.upsample_split)
+
+    if args.upsample_split > 1:
+        sampler = data.WeightedRandomSampler(train_dataset.weights, len(train_dataset.weights))
+
+        train_dataloader = data.DataLoader(train_dataset, num_workers=3, batch_size=args.batch_size,
+                                           drop_last=True,
+                                           collate_fn=dataset.collateBinarizedBatch,sampler=sampler)
+    else:
+        train_dataloader = data.DataLoader(train_dataset,num_workers=3,batch_size=args.batch_size,shuffle=True,drop_last=True,
                                        collate_fn=dataset.collateBinarizedBatch)
 
     dev_dataset = dataset.segmentationBinarizedDataset(args.dev_corpus, vocabulary)
@@ -38,13 +46,19 @@ if __name__ == "__main__":
 
 
     model = SimpleRNN(args,vocabulary).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.001)
+
+    if args.optimizer == "adam":
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=args.lr)
     loss_weights = torch.Tensor([1.0,args.split_weight]).to(device)
     loss = torch.nn.CrossEntropyLoss(weight=loss_weights)
 
 
     end_prep = time.time()
     print("Model preparation took: ",str(end_prep - start_prep), " seconds.")
+
+    best_metric = -1
 
     for epoch in range(1, args.epochs):
         optimizer.zero_grad()
@@ -91,8 +105,12 @@ if __name__ == "__main__":
 
             print("Epoch ", epoch, ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
             print("Dev Accuracy:", accuracy_score(true_l, predicted_l))
-            print("Dev precision, Recall, F1 (Macro): ", precision_recall_fscore_support(true_l, predicted_l, average='macro'))
+            precision, recall, f1, _ = precision_recall_fscore_support(true_l, predicted_l, average='macro')
+            print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
             print(classification_report(true_l, predicted_l))
+
+            if f1 > best_metric:
+                best_metric = f1
 
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
             if not os.path.exists(args.output_folder):
@@ -101,4 +119,11 @@ if __name__ == "__main__":
                 'version': "0.1",
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-            }, args.output_folder + "/model.last.pt", pickle_protocol=4)
+            }, args.output_folder + "/model."+str(epoch)+"pt", pickle_protocol=4)
+
+            if f1 >= best_metric:
+                torch.save({
+                    'version': "0.1",
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                }, args.output_folder + "/model.best.pt", pickle_protocol=4)

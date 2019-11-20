@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class SimpleRNN(nn.Module):
 
     def __init__(self,args,dictionary):
@@ -9,7 +10,7 @@ class SimpleRNN(nn.Module):
         self.rnn = nn.GRU(batch_first=True, input_size=args.embedding_size,
                           hidden_size=args.rnn_layer_size)
 
-        self.linear1 = nn.Linear(args.rnn_layer_size, args.n_classes,bias=True)
+        self.linear1 = nn.Linear(args.rnn_layer_size, args.n_classes, bias=True)
 
         self.embedding = nn.Embedding(
             num_embeddings=len(dictionary),
