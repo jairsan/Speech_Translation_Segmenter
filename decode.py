@@ -31,7 +31,6 @@ def get_decision(model,sentence,vocab_dictionary):
     #In the future, we should compute probs if we want to carry out search
     decision = torch.argmax(results,dim=1).detach().cpu().numpy().tolist()
 
-
     return decision
 
 
@@ -91,9 +90,11 @@ def decode_from_file(file_path, args, model, vocabulary):
             print(" ".join(buffer))
             buffer = []
 
+    buffer.extend(text[len(text)-window_size:])
+    print(" ".join(buffer))
+
 
 def decode_from_list_of_files(args, model, vocabulary):
-
     with open(args.input_file_list) as f_lst:
         for line in f_lst:
             decode_from_file(line.strip(), args, model, vocabulary)
