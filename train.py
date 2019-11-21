@@ -5,7 +5,7 @@ import argparse
 import torch
 import torch.utils.data as data
 import torch.optim as optim
-import time, os
+import time, os, math
 import numpy as np
 
 from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
@@ -44,13 +44,18 @@ if __name__ == "__main__":
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=3, batch_size=args.batch_size, shuffle=False, drop_last=False,
                                        collate_fn=dataset.collateBinarizedBatch)
 
-
     model = SimpleRNN(args,vocabulary).to(device)
 
     if args.optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
     else:
         optimizer = optim.SGD(model.parameters(), lr=args.lr)
+
+    if args.lr_schedule == "reduce_on_plateau":
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=args.lr_reduce_factor,
+                                                               patience=args.lr_reduce_patience, verbose=True)
+
+
     loss_weights = torch.Tensor([1.0,args.split_weight]).to(device)
     loss = torch.nn.CrossEntropyLoss(weight=loss_weights)
 
@@ -58,8 +63,8 @@ if __name__ == "__main__":
     end_prep = time.time()
     print("Model preparation took: ",str(end_prep - start_prep), " seconds.")
 
-    best_metric = -1
-
+    best_result = -math.inf
+    best_epoch = -math.inf
     for epoch in range(1, args.epochs):
         optimizer.zero_grad()
 
@@ -109,8 +114,12 @@ if __name__ == "__main__":
             print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
             print(classification_report(true_l, predicted_l))
 
-            if f1 > best_metric:
-                best_metric = f1
+            if f1 > best_result:
+                best_result = f1
+                best_epoch = epoch
+
+            if args.lr_schedule == "reduce_on_plateau":
+                scheduler.step(f1)
 
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
             if not os.path.exists(args.output_folder):
@@ -121,9 +130,12 @@ if __name__ == "__main__":
                 'optimizer_state_dict': optimizer.state_dict(),
             }, args.output_folder + "/model."+str(epoch)+"pt", pickle_protocol=4)
 
-            if f1 >= best_metric:
+            if f1 >= best_result:
                 torch.save({
                     'version': "0.1",
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                 }, args.output_folder + "/model.best.pt", pickle_protocol=4)
+                
+    print("Training finished.")
+    print("Best result:",best_result, ", achieved at epoch:", best_epoch)

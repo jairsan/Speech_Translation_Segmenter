@@ -13,6 +13,12 @@ def add_train_arguments(parser):
     parser.add_argument("--checkpoint_interval", type=int, default=1, help="Save model every n epochs")
     parser.add_argument("--optimizer", choices=['sgd', 'adam'], default="sgd")
     parser.add_argument("--lr", type=float, default=0.001)
+    parser.add_argument("--lr_schedule", choices=['fixed', 'reduce_on_plateau'], default="fixed")
+    parser.add_argument("--lr_reduce_patience", type=int, default=5)
+    parser.add_argument("--lr_reduce_factor", type=float, default=0.5)
+
+
+
 
 
 def add_model_arguments(parser):
