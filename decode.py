@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
     model = SimpleRNN(args,vocabulary).to(device)
     model = load_model(args.model_path, model)
-
+    model.eval()
     if args.input_format == "sample_file":
         decode_from_sample_file(args, model, vocabulary)
     elif args.input_format == "list_of_text_files":

@@ -71,6 +71,8 @@ if __name__ == "__main__":
         epoch_cost = 0
 
         update = 0
+
+        model.train()
         for x, src_lengths, y in train_dataloader:
 
             x, y = x.to(device), y.to(device)
@@ -93,6 +95,7 @@ if __name__ == "__main__":
             predicted_l = []
             true_l = []
             epoch_cost = 0
+            model.eval()
             for x, src_lengths, y in dev_dataloader:
 
                 x, y = x.to(device), y.to(device)
@@ -136,6 +139,6 @@ if __name__ == "__main__":
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                 }, args.output_folder + "/model.best.pt", pickle_protocol=4)
-                
+
     print("Training finished.")
     print("Best result:",best_result, ", achieved at epoch:", best_epoch)

@@ -7,10 +7,6 @@ class SimpleRNN(nn.Module):
 
     def __init__(self,args,dictionary):
         super(SimpleRNN, self).__init__()
-        self.rnn = nn.GRU(batch_first=True, input_size=args.embedding_size,
-                          hidden_size=args.rnn_layer_size)
-
-        self.linear1 = nn.Linear(args.rnn_layer_size, args.n_classes, bias=True)
 
         self.embedding = nn.Embedding(
             num_embeddings=len(dictionary),
@@ -18,11 +14,23 @@ class SimpleRNN(nn.Module):
             padding_idx=dictionary.pad_index,
         )
 
+        self.embedding_dropout = torch.nn.Dropout(p=args.dropout)
+
+        # We put dropout in case we add multiple layers in the future
+        self.rnn = nn.GRU(batch_first=True, input_size=args.embedding_size,
+                          hidden_size=args.rnn_layer_size,dropout=args.dropout)
+
+        self.post_rnn_dropout = torch.nn.Dropout(p=args.dropout)
+
+        self.linear1 = nn.Linear(args.rnn_layer_size, args.n_classes, bias=True)
+
     def forward(self, x, src_lengths, h0=None):
         x = self.embedding(x)
+        x = self.embedding_dropout(x)
         x = nn.utils.rnn.pack_padded_sequence(x, src_lengths, batch_first=True, enforce_sorted=False)
         x, hn = self.rnn(x,h0)
         x, lengths = nn.utils.rnn.pad_packed_sequence(x, batch_first=True, padding_value=0.0)
+        x = self.post_rnn_dropout(x)
         x = self.linear1(x)
         return x, lengths, hn
 

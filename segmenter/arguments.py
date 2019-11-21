@@ -20,7 +20,6 @@ def add_train_arguments(parser):
 
 
 
-
 def add_model_arguments(parser):
     # Model parameters
     parser.add_argument("--rnn_layer_size", type=int, help="Hidden size of the RNN layers")
@@ -28,6 +27,7 @@ def add_model_arguments(parser):
     parser.add_argument("--classifier_hidden_size", type=int, help="Size of the classifier layers")
     parser.add_argument("--embedding_size", type=int, help="Size of the embedding")
     parser.add_argument("--n_classes", type=int, help="Number of classification targets")
+    parser.add_argument("--dropout", type=float, default=0.0)
 
 
 # TODO: Fix stream so that it only infers from stdin.
