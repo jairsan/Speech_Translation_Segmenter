@@ -3,26 +3,41 @@ import torch.nn as nn
 import argparse
 
 from segmenter import dataset,arguments,vocab
-from segmenter.models.simple_rnn import SimpleRNN
+from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
+from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
 
 from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
 
 
-def load_model(path,model):
-    checkpoint = torch.load(path)
+def load_model(args):
+
+    checkpoint = torch.load(args.model_path)
+
+    saved_model_args = checkpoint['args']
+
+    vocabulary = checkpoint['vocabulary']
+
+    if saved_model_args.model_architecture == "ff_text":
+        model = SimpleRNNFFTextModel(saved_model_args, vocabulary).to(device)
+    else:
+        model = SimpleRNNTextModel(saved_model_args, vocabulary).to(device)
+
     model.load_state_dict(checkpoint['model_state_dict'])
 
-    return model
+    return model,vocabulary
 
 
-def get_decision(model,sentence,vocab_dictionary):
-    #Sentence is a list of words
+def get_decision(model,sentence,vocab_dictionary, device):
+    """
+    Given a list of words (sentence) and a model,
+    returns the decision (split or not split) given by the model
+    """
 
     tokens_i = []
     for word in sentence:
         tokens_i.append(vocab_dictionary.get_index(word))
 
-    x = torch.LongTensor([tokens_i])
+    x = torch.LongTensor([tokens_i]).to(device)
     X = nn.utils.rnn.pad_sequence(x, batch_first=True)
     model_output, lengths, hn = model.forward(X, [len(tokens_i)])
 
@@ -34,7 +49,7 @@ def get_decision(model,sentence,vocab_dictionary):
     return decision
 
 
-def decode_from_sample_file(args, model, vocabulary):
+def decode_from_sample_file(args, model, vocabulary, device):
     targets = []
     decisions = []
     with open(args.file) as f:
@@ -55,7 +70,7 @@ def decode_from_sample_file(args, model, vocabulary):
     print(classification_report(decisions, targets))
 
 
-def decode_from_file(file_path, args, model, vocabulary):
+def decode_from_file(file_path, args, model, vocabulary, device):
 
     text = []
 
@@ -64,8 +79,8 @@ def decode_from_file(file_path, args, model, vocabulary):
             l = l.strip().split()
             text.extend(l)
 
-    max_len = 15
-    window_size = 4
+    max_len = args.sample_max_len
+    window_size = args.sample_window_size
 
     history = ["</s>"] * (max_len - window_size - 1)
 
@@ -77,7 +92,7 @@ def decode_from_file(file_path, args, model, vocabulary):
         sample = history + [text[i]] + text[i+1:i+window_size+1]
         assert len(sample) == max_len
 
-        decision = get_decision(model,sample,vocabulary)[0]
+        decision = get_decision(model,sample,vocabulary, device)[0]
 
         if decision == 0:
             history.pop(0)
@@ -94,22 +109,21 @@ def decode_from_file(file_path, args, model, vocabulary):
     print(" ".join(buffer))
 
 
-def decode_from_list_of_files(args, model, vocabulary):
+def decode_from_list_of_files(args, model, vocabulary, device):
     with open(args.input_file_list) as f_lst:
         for line in f_lst:
-            decode_from_file(line.strip(), args, model, vocabulary)
+            decode_from_file(line.strip(), args, model, vocabulary, device)
 
 
 #TODO: Complete. This should decode only from stdin or server port. This is the true online version
 def decode_from_stream(args, model, vocabulary):
-    pass
+    raise NotImplementedError
 
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
 
-    device = "cpu"
-    #device = torch.device("cuda:0" if use_cuda else "cpu")
+    device = torch.device("cuda:0" if use_cuda else "cpu")
 
     parser = argparse.ArgumentParser()
 
@@ -117,15 +131,13 @@ if __name__ == "__main__":
     arguments.add_model_arguments(parser)
     args = parser.parse_args()
 
-    vocabulary = vocab.VocabDictionary()
-    vocabulary.create_from_count_file(args.vocabulary)
+    model, vocabulary = load_model(args)
 
-    model = SimpleRNN(args,vocabulary).to(device)
-    model = load_model(args.model_path, model)
+    model = model.to(device)
     model.eval()
     if args.input_format == "sample_file":
-        decode_from_sample_file(args, model, vocabulary)
+        decode_from_sample_file(args, model, vocabulary, device)
     elif args.input_format == "list_of_text_files":
-        decode_from_list_of_files(args, model, vocabulary)
+        decode_from_list_of_files(args, model, vocabulary, device)
     else:
-        decode_from_stream(args, model, vocabulary)
+        decode_from_stream(args, model, vocabulary, device)
