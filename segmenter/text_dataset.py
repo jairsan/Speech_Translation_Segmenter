@@ -5,7 +5,8 @@ import torch.nn as nn
 
 SEED=5
 
-class segmentationBinarizedDataset(data.Dataset):
+
+class SegmentationTextDataset(data.Dataset):
 
     def __init__(self,file, vocab_dictionary, min_split_samples_batch_ratio=0.0, unk_noise_prob=0.0):
         # Samples is a list of tuples. Element 0 is the Tensor of indices. Element 1 is the target
@@ -80,7 +81,8 @@ class segmentationBinarizedDataset(data.Dataset):
 
         return item
 
-def collateBinarizedBatch(batch):
+
+def collater(batch):
     """
     Returns a padded sequence
     """

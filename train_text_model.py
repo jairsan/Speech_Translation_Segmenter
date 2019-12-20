@@ -1,4 +1,4 @@
-from segmenter import dataset,arguments,vocab
+from segmenter import text_dataset,arguments,vocab
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
 from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
 
@@ -26,21 +26,21 @@ if __name__ == "__main__":
     vocabulary = vocab.VocabDictionary()
     vocabulary.create_from_count_file(args.vocabulary)
 
-    train_dataset = dataset.segmentationBinarizedDataset(args.train_corpus,vocabulary,args.min_split_samples_batch_ratio,args.unk_noise_prob)
+    train_dataset = text_dataset.SegmentationTextDataset(args.train_corpus, vocabulary, args.min_split_samples_batch_ratio, args.unk_noise_prob)
 
     if args.min_split_samples_batch_ratio > 0.0:
         sampler = data.WeightedRandomSampler(train_dataset.weights, len(train_dataset.weights))
 
         train_dataloader = data.DataLoader(train_dataset, num_workers=3, batch_size=args.batch_size,
                                            drop_last=True,
-                                           collate_fn=dataset.collateBinarizedBatch,sampler=sampler)
+                                           collate_fn=text_dataset.collater, sampler=sampler)
     else:
-        train_dataloader = data.DataLoader(train_dataset,num_workers=3,batch_size=args.batch_size,shuffle=True,drop_last=True,
-                                       collate_fn=dataset.collateBinarizedBatch)
+        train_dataloader = data.DataLoader(train_dataset, num_workers=3, batch_size=args.batch_size, shuffle=True, drop_last=True,
+                                           collate_fn=text_dataset.collater)
 
-    dev_dataset = dataset.segmentationBinarizedDataset(args.dev_corpus, vocabulary)
+    dev_dataset = text_dataset.SegmentationTextDataset(args.dev_corpus, vocabulary)
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=3, batch_size=args.batch_size, shuffle=False, drop_last=False,
-                                       collate_fn=dataset.collateBinarizedBatch)
+                                     collate_fn=text_dataset.collater)
 
     if args.model_architecture == "ff_text":
         model = SimpleRNNFFTextModel(args, vocabulary).to(device)
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                 'optimizer_state_dict': optimizer.state_dict(),
                 'vocabulary': vocabulary,
                 'args' : args
-            }, args.output_folder + "/model."+str(epoch)+"pt", pickle_protocol=4)
+            }, args.output_folder + "/model."+str(epoch)+".pt", pickle_protocol=4)
 
             if f1 > best_result:
                 best_result = f1

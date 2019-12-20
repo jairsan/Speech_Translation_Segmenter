@@ -24,6 +24,7 @@ class SimpleRNNFFTextModel(nn.Module):
 
         self.post_rnn_dropout = torch.nn.Dropout(p=args.dropout)
 
+
         l = [nn.Linear(args.rnn_layer_size * (args.sample_window_size + 1), args.feedforward_size, bias=True), nn.ReLU(), nn.Dropout(p=args.dropout)]
 
         for i in range(1,self.args.feedforward_layers+1):
@@ -33,14 +34,19 @@ class SimpleRNNFFTextModel(nn.Module):
 
         self.feedforward = nn.ModuleList(l)
 
-        self.output = nn.Linear(args.rnn_layer_size, args.n_classes, bias=True)
+        self.output = nn.Linear(args.feedforward_size, args.n_classes, bias=True)
 
     def forward(self, x, src_lengths, h0=None):
         x, lengths, hn = self.extract_features(x, src_lengths, h0)
 
-        x_ff = x[:, -(self.window_size+1):, :]
-        x = self.feedforward(x_ff)
-        x = self.output(x)
+        x_sel = x[:, -(self.window_size+1):, :]
+
+        x_ff = torch.flatten(x_sel, start_dim=1)
+
+        for layer in self.feedforward:
+            x_ff = layer(x_ff)
+
+        x = self.output(x_ff)
 
         return x, lengths, hn
 

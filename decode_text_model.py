@@ -2,29 +2,11 @@ import torch
 import torch.nn as nn
 import argparse
 
-from segmenter import dataset,arguments,vocab
-from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
-from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
+from segmenter import arguments, utils
 
-from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
+from sklearn.metrics import precision_recall_fscore_support,classification_report
 
-
-def load_model(args):
-
-    checkpoint = torch.load(args.model_path)
-
-    saved_model_args = checkpoint['args']
-
-    vocabulary = checkpoint['vocabulary']
-
-    if saved_model_args.model_architecture == "ff_text":
-        model = SimpleRNNFFTextModel(saved_model_args, vocabulary).to(device)
-    else:
-        model = SimpleRNNTextModel(saved_model_args, vocabulary).to(device)
-
-    model.load_state_dict(checkpoint['model_state_dict'])
-
-    return model,vocabulary
+from segmenter.utils import load_text_model
 
 
 def get_decision(model,sentence,vocab_dictionary, device):
@@ -131,7 +113,7 @@ if __name__ == "__main__":
     arguments.add_model_arguments(parser)
     args = parser.parse_args()
 
-    model, vocabulary = load_model(args)
+    model, vocabulary, _ = utils.load_text_model(args,device)
 
     model = model.to(device)
     model.eval()
