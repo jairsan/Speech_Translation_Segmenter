@@ -24,7 +24,7 @@ def add_train_arguments(parser):
     parser.add_argument("--dev_audio_feas_corpus", type=str, help="Dev containing audio feas")
 
 def add_audio_train_arguments(parser):
-    parser.add_argument("--text_model_path", type=str, help="Load this model", required=True)
+    parser.add_argument("--model_path", type=str, help="Load this model", required=True)
     parser.add_argument("--train_audio_features_corpus", type=str, help="Training audio features file", required=True)
     parser.add_argument("--dev_audio_features_corpus", type=str, help="Dev audio features file", required=True)
 
@@ -46,10 +46,13 @@ def add_model_arguments(parser):
 
 # TODO: Fix stream so that it only infers from stdin.
 def add_infer_arguments(parser):
-    parser.add_argument("--text_model_path", type=str, help="Load this model", required=True)
+    parser.add_argument("--model_path", type=str, help="Load this model", required=True)
+
     parser.add_argument("--input_format",  choices=['sample_file', 'stream', 'list_of_text_files'], help="Input format for the decoding process. ", required=True)
     parser.add_argument("--file", type=str, help="Infer from this sample file")
     parser.add_argument("--input_file_list", type=str, help="Infer from list of files.")
+    parser.add_argument("--input_audio_file_list", type=str, help="Infer from list of files containing audio features.")
+
 
 
 
