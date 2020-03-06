@@ -1,5 +1,7 @@
 from segmenter import text_audio_dataset,arguments,vocab
 from segmenter.models.rnn_ff_audio_text_model import RNNFFAudioTextModel
+from segmenter.models.rnn_ff_audio_text_feas_copy_model import RNNFFAudioTextFeasCopyModel
+
 from segmenter import utils
 import argparse
 import torch
@@ -49,7 +51,12 @@ if __name__ == "__main__":
 
     text_features_size = saved_model_args.rnn_layer_size
 
-    model = RNNFFAudioTextModel(args,text_features_size)
+    if args.model_architecture == "ff-audio-text-copy-feas" :
+
+        model = RNNFFAudioTextFeasCopyModel(args, text_features_size)
+
+    else:
+        model = RNNFFAudioTextModel(args,text_features_size)
 
     model.to(device)
 

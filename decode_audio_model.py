@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
 import argparse
+import copy
 
 from segmenter import arguments, utils
-
-from sklearn.metrics import precision_recall_fscore_support,classification_report
 
 from segmenter.utils import load_text_model
 
@@ -41,6 +40,32 @@ def get_decision(text_model,audio_model,sentence,audio_features, vocab_dictionar
 
     return decision
 
+def get_probs(text_model,audio_model,sentence,audio_features, vocab_dictionary, device):
+    """
+    Given a list of words (sentence) and a model,
+    returns the decision (split or not split) given by the model
+    """
+
+    tokens_i = []
+    for word in sentence:
+        tokens_i.append(vocab_dictionary.get_index(word))
+
+    x = torch.LongTensor([tokens_i]).to(device)
+    x_audio = torch.FloatTensor([audio_features]).to(device)
+
+
+
+    X = nn.utils.rnn.pad_sequence(x, batch_first=True)
+    X_feas = nn.utils.rnn.pad_sequence(x_audio,batch_first=True)
+
+
+
+    text_feas, _, _ = text_model.extract_features(X, [len(tokens_i)])
+
+    prediction, _, _ = audio_model.forward(X_feas, text_feas, [len(tokens_i)])
+
+    return torch.nn.functional.log_softmax(prediction, dim=1).detach().cpu().numpy()
+
 
 def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audio_model, vocabulary, device):
 
@@ -74,7 +99,6 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
     #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
     for i in range(len(text)-window_size):
         buffer.append(text[i])
-        buffer_a.append(audio_features[i])
 
 
         sample = history + [text[i]] + text[i+1:i+window_size+1]
@@ -102,16 +126,110 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
 
             print(" ".join(buffer))
             buffer = []
-            buffer_a = []
 
     buffer.extend(text[len(text)-window_size:])
     print(" ".join(buffer))
+
+def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audio_model, vocabulary, device):
+
+    text = []
+    audio_features = []
+
+    with open(text_file_path) as f:
+        for l in f:
+            l = l.strip().split()
+            text.extend(l)
+
+    with open(audio_file_path) as f:
+        for line in f:
+            audio_features.append(list(map(float, line.strip().split())))
+
+
+    max_len = args.sample_max_len
+    window_size = args.sample_window_size
+
+    history = ["</s>"] * (max_len - window_size - 1)
+
+    history_a = []
+    for _ in range(max_len - window_size - 1):
+        history_a.append(FILLER_FEA)
+
+    cubeta = []
+
+    cubeta.append((history, history_a, [[]], 0))
+
+    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    for i in range(len(text)-window_size):
+
+        cubeta2 = []
+        for j in range(len(cubeta)):
+
+            history, history_a, segmentation_history, score = cubeta[j]
+
+            sample = history + [text[i]] + text[i+1:i+window_size+1]
+            sample_a = history_a + [audio_features[i]] + audio_features[i+1:i+window_size+1]
+
+
+            probs = get_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
+
+
+            # No split
+            history_0 = copy.deepcopy(history)
+            history_a_0 = copy.deepcopy(history_a)
+            segmentation_history_0 = copy.deepcopy(segmentation_history)
+
+            history_0.pop(0)
+            history_0.append(text[i])
+
+            history_a_0.pop(0)
+            history_a_0.append(audio_features[i])
+
+            segmentation_history_0[-1].append(text[i])
+
+            cubeta2.append((history_0, history_a_0, segmentation_history_0, score + probs[0][0]))
+
+
+            # Split
+            history_1 = copy.deepcopy(history)
+            history_a_1 = copy.deepcopy(history_a)
+            segmentation_history_1 = copy.deepcopy(segmentation_history)
+
+            history_1.pop(0)
+            history_1.pop(0)
+            history_1.append(text[i])
+            history_1.append("</s>")
+
+            history_a_1.pop(0)
+            history_a_1.pop(0)
+            history_a_1.append(audio_features[i])
+            history_a_1.append(FILLER_FEA)
+
+            segmentation_history_1[-1].append(text[i])
+
+            segmentation_history_1.append([])
+
+            cubeta2.append((history_1, history_a_1, segmentation_history_1, score + probs[0][1]))
+
+        cubeta2.sort(key=lambda hypo: hypo[3], reverse=True)
+        cubeta = cubeta2[:min(args.beam,len(cubeta2))]
+
+
+    best_hypo = cubeta[0]
+
+    best_hypo[2][-1].extend(text[len(text)-window_size:])
+
+    for line in best_hypo[2]:
+        print(" ".join(line))
 
 
 def decode_from_list_of_file_pairs(args, text_model, audio_model, vocabulary, device):
     with open(args.input_file_list) as f_lst, open(args.input_audio_file_list) as a_lst:
         for text_f, audio_f in zip(f_lst,a_lst):
-            decode_from_file_pair(text_f.strip(), audio_f.strip(), args, text_model, audio_model, vocabulary, device)
+            if args.beam > 1:
+                beam_decode_from_file_pair(text_f.strip(), audio_f.strip(), args, text_model, audio_model, vocabulary,
+                                      device)
+            else:
+                decode_from_file_pair(text_f.strip(), audio_f.strip(), args, text_model, audio_model, vocabulary, device)
 
 
 if __name__ == "__main__":
@@ -134,3 +252,4 @@ if __name__ == "__main__":
     audio_model.eval()
 
     decode_from_list_of_file_pairs(args, text_model, audio_model, vocabulary, device)
+

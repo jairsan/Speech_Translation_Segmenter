@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import argparse
+import copy
 
 from segmenter import arguments, utils
 
@@ -29,6 +30,24 @@ def get_decision(model,sentence,vocab_dictionary, device):
     decision = torch.argmax(results,dim=1).detach().cpu().numpy().tolist()
 
     return decision
+
+def get_probs(model,sentence,vocab_dictionary, device):
+    """
+    Given a list of words (sentence) and a model,
+    returns the decision (split or not split) given by the model
+    """
+
+    tokens_i = []
+    for word in sentence:
+        tokens_i.append(vocab_dictionary.get_index(word))
+
+    x = torch.LongTensor([tokens_i]).to(device)
+    X = nn.utils.rnn.pad_sequence(x, batch_first=True)
+    model_output, lengths, hn = model.forward(X, [len(tokens_i)])
+
+    results = model.get_sentence_prediction(model_output, lengths, device)
+
+    return torch.nn.functional.log_softmax(results, dim=1).detach().cpu().numpy()
 
 
 def decode_from_sample_file(args, model, vocabulary, device):
@@ -90,14 +109,87 @@ def decode_from_file(file_path, args, model, vocabulary, device):
     buffer.extend(text[len(text)-window_size:])
     print(" ".join(buffer))
 
+def beam_decode_from_file(file_path, args, model, vocabulary, device):
+
+    text = []
+
+    with open(file_path) as f:
+        for l in f:
+            l = l.strip().split()
+            text.extend(l)
+
+    max_len = args.sample_max_len
+    window_size = args.sample_window_size
+
+    history = ["</s>"] * (max_len - window_size - 1)
+
+
+    cubeta = []
+
+    cubeta.append((history, [[]], 0))
+
+    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    for i in range(len(text)-window_size):
+
+        cubeta2 = []
+        for j in range(len(cubeta)):
+
+            history, segmentation_history, score = cubeta[j]
+
+            sample = history + [text[i]] + text[i+1:i+window_size+1]
+
+
+            probs = get_probs(model,sample,vocabulary, device)
+
+            # No split
+            history_0 = copy.deepcopy(history)
+            segmentation_history_0 = copy.deepcopy(segmentation_history)
+
+            history_0.pop(0)
+            history_0.append(text[i])
+
+            segmentation_history_0[-1].append(text[i])
+
+            cubeta2.append((history_0, segmentation_history_0, score + probs[0][0]))
+
+            # Split
+            history_1 = copy.deepcopy(history)
+            segmentation_history_1 = copy.deepcopy(segmentation_history)
+
+            history_1.pop(0)
+            history_1.pop(0)
+            history_1.append(text[i])
+            history_1.append("</s>")
+
+            segmentation_history_1[-1].append(text[i])
+
+            segmentation_history_1.append([])
+
+            cubeta2.append((history_1, segmentation_history_1, score + probs[0][1]))
+
+        cubeta2.sort(key=lambda hypo: hypo[3], reverse=True)
+        cubeta = cubeta2[:min(args.beam,len(cubeta2))]
+
+
+    best_hypo = cubeta[0]
+
+    best_hypo[2][-1].extend(text[len(text)-window_size:])
+
+    for line in best_hypo[2]:
+        print(" ".join(line))
+
+
 
 def decode_from_list_of_files(args, model, vocabulary, device):
     with open(args.input_file_list) as f_lst:
         for line in f_lst:
-            decode_from_file(line.strip(), args, model, vocabulary, device)
+            if args.beam > 1:
+                beam_decode_from_file(line.strip(), args, model, vocabulary, device)
+            else:
+                decode_from_file(line.strip(), args, model, vocabulary, device)
 
 
-#TODO: Complete. This should decode only from stdin or server port. This is the true online version
+#TODO: Complete. This should decode only from stdin or server port. This is the true online version.
 def decode_from_stream(args, model, vocabulary):
     raise NotImplementedError
 
@@ -113,7 +205,7 @@ if __name__ == "__main__":
     arguments.add_model_arguments(parser)
     args = parser.parse_args()
 
-    model, vocabulary, _ = utils.load_text_model(args,device)
+    model, vocabulary, _ = utils.load_text_model(args)
 
     model = model.to(device)
     model.eval()

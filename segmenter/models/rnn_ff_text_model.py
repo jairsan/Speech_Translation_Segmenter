@@ -27,7 +27,7 @@ class SimpleRNNFFTextModel(nn.Module):
 
         l = [nn.Linear(args.rnn_layer_size * (args.sample_window_size + 1), args.feedforward_size, bias=True), nn.ReLU(), nn.Dropout(p=args.dropout)]
 
-        for i in range(1,self.args.feedforward_layers+1):
+        for i in range(1,self.args.feedforward_layers):
             l.append(nn.Linear(args.feedforward_size, args.feedforward_size, bias=True))
             l.append(nn.ReLU())
             l.append(nn.Dropout(p=args.dropout))

@@ -31,12 +31,14 @@ def add_audio_train_arguments(parser):
 def add_model_arguments(parser):
     # Model parameters
     parser.add_argument("--rnn_layer_size", type=int, help="Hidden size of the RNN layers")
+    parser.add_argument("--audio_rnn_layer_size", type=int, help="Hidden size of the RNN layers for the audio encoder")
     parser.add_argument("--embedding_size", type=int, help="Size of the embedding")
     parser.add_argument("--feedforward_layers", type=int, help="Number of feedforward layers (Only for ff architecture)")
     parser.add_argument("--feedforward_size", type=int, help="Size of feedforward layers (Only for ff architecture)")
     parser.add_argument("--n_classes", type=int, choices=[2], required=False, help="Number of classification targets")
     parser.add_argument("--dropout", type=float, default=0.0)
-    parser.add_argument("--model_architecture", type=str, choices = ["simple-text", "ff-text"], default = "simple_text",
+    parser.add_argument("--model_architecture", type=str, choices = ["simple-text", "ff-text", "ff-audio-text",
+                                                                     "ff-audio-text-copy-feas"], default = "simple_text",
                         )
     parser.add_argument("--sample_max_len", type=int, help="Total number of tokens on each sample.")
     parser.add_argument("--sample_window_size", type=int, help="Number of tokens in the future window of each sample. "
@@ -47,7 +49,7 @@ def add_model_arguments(parser):
 # TODO: Fix stream so that it only infers from stdin.
 def add_infer_arguments(parser):
     parser.add_argument("--model_path", type=str, help="Load this model", required=True)
-
+    parser.add_argument("--beam", type=int, help="Use beam search, with beam of size b", default=1 )
     parser.add_argument("--input_format",  choices=['sample_file', 'stream', 'list_of_text_files'], help="Input format for the decoding process. ", required=True)
     parser.add_argument("--file", type=str, help="Infer from this sample file")
     parser.add_argument("--input_file_list", type=str, help="Infer from list of files.")

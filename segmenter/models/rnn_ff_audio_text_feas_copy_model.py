@@ -3,22 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class RNNFFAudioTextModel(nn.Module):
+class RNNFFAudioTextFeasCopyModel(nn.Module):
 
     def __init__(self,args,text_features_size):
-        super(RNNFFAudioTextModel, self).__init__()
+        super(RNNFFAudioTextFeasCopyModel, self).__init__()
 
         self.args = args
 
         self.window_size = args.sample_window_size
 
-        # We put dropout in case we add multiple layers in the future
-        self.rnn = nn.GRU(batch_first=True, input_size=args.embedding_size,
-                          hidden_size=args.audio_rnn_layer_size,dropout=args.dropout)
-
-        self.post_rnn_dropout = torch.nn.Dropout(p=args.dropout)
-
-        l = [nn.Linear( (args.audio_rnn_layer_size + text_features_size) * (args.sample_window_size + 1), args.feedforward_size, bias=True),
+        l = [nn.Linear( (args.embedding_size + text_features_size) * (args.sample_window_size + 1), args.feedforward_size, bias=True),
              nn.ReLU(), nn.Dropout(p=args.dropout)]
 
         for i in range(1,self.args.feedforward_layers):
@@ -33,7 +27,6 @@ class RNNFFAudioTextModel(nn.Module):
     def forward(self, x_feas, text_feas, src_lengths, h0=None):
 
         x_feas = nn.utils.rnn.pack_padded_sequence(x_feas, src_lengths, batch_first=True, enforce_sorted=False)
-        x_feas, hn = self.rnn(x_feas)
         x_feas, lengths = nn.utils.rnn.pad_packed_sequence(x_feas, batch_first=True, padding_value=0.0)
 
         # Concatenate on the last dimension
@@ -50,7 +43,7 @@ class RNNFFAudioTextModel(nn.Module):
 
         x_ff = self.output(x_ff)
 
-        return x_ff, lengths, hn
+        return x_ff, lengths, None
 
     def get_sentence_prediction(self,model_output,lengths, device):
         """
