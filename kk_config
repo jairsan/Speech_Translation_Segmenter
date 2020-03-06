@@ -1,0 +1,7 @@
+SYSTEM_DIRECTORY=/scratch/translectures/systems/mt/en-es/X5gon-M28
+src=en
+tgt=es
+PYTHON_ENV=/scratch/ttpuser/venvs/python3.6__pytorch1.2__fairseq0.8.0__cuda10.0/bin/activate
+SEGMENTER_CHECKPOINT=/scratch/jiranzotmp/trabajo/ST-Segmenter_experiments/train_segmenter/en/Europarl-ST_en-de_audio_feas/256_2ff_19_4_audio_copy_feas/model.best.pt
+SEGMENTER_MAX_LEN=15
+SEGMENTER_WINDOW_SIZE=4
