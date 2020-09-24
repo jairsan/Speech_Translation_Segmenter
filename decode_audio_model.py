@@ -11,7 +11,7 @@ from segmenter.utils import load_text_model
 FILLER_FEA=[0.0, 0.0, 0.0]
 
 
-def get_decision(text_model,audio_model,sentence,audio_features, vocab_dictionary, device):
+def get_decision_and_probs(text_model,audio_model,sentence,audio_features, vocab_dictionary, device):
     """
     Given a list of words (sentence) and a model,
     returns the decision (split or not split) given by the model
@@ -37,35 +37,9 @@ def get_decision(text_model,audio_model,sentence,audio_features, vocab_dictionar
 
     #In the future, we should compute probs if we want to carry out search
     decision = torch.argmax(prediction,dim=1).detach().cpu().numpy().tolist()
+    probs = torch.nn.functional.log_softmax(prediction, dim=1).detach().cpu().numpy()
 
-    return decision
-
-def get_probs(text_model,audio_model,sentence,audio_features, vocab_dictionary, device):
-    """
-    Given a list of words (sentence) and a model,
-    returns the decision (split or not split) given by the model
-    """
-
-    tokens_i = []
-    for word in sentence:
-        tokens_i.append(vocab_dictionary.get_index(word))
-
-    x = torch.LongTensor([tokens_i]).to(device)
-    x_audio = torch.FloatTensor([audio_features]).to(device)
-
-
-
-    X = nn.utils.rnn.pad_sequence(x, batch_first=True)
-    X_feas = nn.utils.rnn.pad_sequence(x_audio,batch_first=True)
-
-
-
-    text_feas, _, _ = text_model.extract_features(X, [len(tokens_i)])
-
-    prediction, _, _ = audio_model.forward(X_feas, text_feas, [len(tokens_i)])
-
-    return torch.nn.functional.log_softmax(prediction, dim=1).detach().cpu().numpy()
-
+    return decision, probs
 
 def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audio_model, vocabulary, device):
 
@@ -104,8 +78,13 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
         sample = history + [text[i]] + text[i+1:i+window_size+1]
         sample_a = history_a + [audio_features[i]] + audio_features[i+1:i+window_size+1]
 
-        decision = get_decision(text_model,audio_model,sample,sample_a,vocabulary, device)[0]
+        decision_t, probs = get_decision_and_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
+        
+        #if args.debug:
+        #    print(probs)
 
+        decision = decision_t[0]
+        #if decision == 0 and len(buffer) < args.chunk_max_length:
         if decision == 0:
             history.pop(0)
             history.append(text[i])
@@ -127,7 +106,7 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
             print(" ".join(buffer))
             buffer = []
 
-    buffer.extend(text[len(text)-window_size:])
+    buffer.extend(text[max(0,len(text)-window_size):])
     print(" ".join(buffer))
 
 def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audio_model, vocabulary, device):
@@ -158,8 +137,53 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
 
     cubeta.append((history, history_a, [[]], 0))
 
+
+    greedy_score=0
+
+
+    greedy_hypo=[[]]
+
+
+    ghistory = copy.deepcopy(history)
+    ghistory_a = copy.deepcopy(history_a)
+
     #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
     for i in range(len(text)-window_size):
+
+
+        if args.debug:
+            sample = ghistory + [text[i]] + text[i + 1:i + window_size + 1]
+            sample_a = ghistory_a + [audio_features[i]] + audio_features[i + 1:i + window_size + 1]
+
+            decision_k, probs = get_decision_and_probs(text_model, audio_model, sample, sample_a, vocabulary, device)
+            decision=decision_k[0]
+
+            greedy_hypo[-1].append(text[i])
+
+            if decision == 0:
+                ghistory.pop(0)
+                ghistory.append(text[i])
+
+                ghistory_a.pop(0)
+                ghistory_a.append(audio_features[i])
+
+                greedy_score += probs[0][0]
+            else:
+                ghistory.pop(0)
+                ghistory.pop(0)
+                ghistory.append(text[i])
+                ghistory.append("</s>")
+
+                ghistory_a.pop(0)
+                ghistory_a.pop(0)
+                ghistory_a.append(audio_features[i])
+                ghistory_a.append(FILLER_FEA)
+
+                greedy_hypo.append([])
+
+                greedy_score += probs[0][1]
+
+
 
         cubeta2 = []
         for j in range(len(cubeta)):
@@ -170,7 +194,7 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
             sample_a = history_a + [audio_features[i]] + audio_features[i+1:i+window_size+1]
 
 
-            probs = get_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
+            _, probs = get_decision_and_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
 
 
             # No split
@@ -213,10 +237,19 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
         cubeta2.sort(key=lambda hypo: hypo[3], reverse=True)
         cubeta = cubeta2[:min(args.beam,len(cubeta2))]
 
-
     best_hypo = cubeta[0]
 
-    best_hypo[2][-1].extend(text[len(text)-window_size:])
+    best_hypo[2][-1].extend(text[max(len(text)-window_size,0):])
+    greedy_hypo[-1].extend(text[max(len(text)-window_size,0):])
+
+    if args.debug:
+        print("########")
+        print(best_hypo[2] == greedy_hypo)
+        print(greedy_hypo)
+        print(greedy_score)
+        print(best_hypo[2])
+        print(best_hypo[3])
+        print("########")
 
     for line in best_hypo[2]:
         print(" ".join(line))
@@ -252,4 +285,5 @@ if __name__ == "__main__":
     audio_model.eval()
 
     decode_from_list_of_file_pairs(args, text_model, audio_model, vocabulary, device)
+
 

@@ -95,7 +95,7 @@ def decode_from_file(file_path, args, model, vocabulary, device):
 
         decision = get_decision(model,sample,vocabulary, device)[0]
 
-        if decision == 0:
+        if decision == 0 and len(buffer) < args.chunk_max_length:
             history.pop(0)
             history.append(text[i])
         else:
@@ -106,7 +106,7 @@ def decode_from_file(file_path, args, model, vocabulary, device):
             print(" ".join(buffer))
             buffer = []
 
-    buffer.extend(text[len(text)-window_size:])
+    buffer.extend(text[max(0,len(text)-window_size):])
     print(" ".join(buffer))
 
 def beam_decode_from_file(file_path, args, model, vocabulary, device):
@@ -167,15 +167,15 @@ def beam_decode_from_file(file_path, args, model, vocabulary, device):
 
             cubeta2.append((history_1, segmentation_history_1, score + probs[0][1]))
 
-        cubeta2.sort(key=lambda hypo: hypo[3], reverse=True)
+        cubeta2.sort(key=lambda hypo: hypo[2], reverse=True)
         cubeta = cubeta2[:min(args.beam,len(cubeta2))]
 
 
     best_hypo = cubeta[0]
 
-    best_hypo[2][-1].extend(text[len(text)-window_size:])
+    best_hypo[1][-1].extend(text[max(0,len(text)-window_size):])
 
-    for line in best_hypo[2]:
+    for line in best_hypo[1]:
         print(" ".join(line))
 
 
