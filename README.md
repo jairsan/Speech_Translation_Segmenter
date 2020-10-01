@@ -109,18 +109,51 @@ python train_audio_model_from_pretrained_text.py \
 --model_architecture ff-audio-text-copy-feas
 ```
 
-The "ff-audio-text-copy-feas" architecure corresponds to the "Audio w/o RNN" on the paper. You can also train "Audio w/ RNN" models using --model_architecture ff-audio-text and --audio_rnn_layer_size [int].
+The "ff-audio-text-copy-feas" architecture corresponds to the "Audio w/o RNN" on the paper. You can also train "Audio w/ RNN" models using --model_architecture ff-audio-text and --audio_rnn_layer_size [int].
 
 ## Segmentation
 
-Decoding with a text model is very simple., you just need
-to provide a list containing the files whose content you want to split
+Decoding with a text model is very simple. You will provide a list file, each line of that file will contain the file path to a file whose contests you want to split.
 
 ```
+ls test/ > test_files.lst
+
 python decode_text_model.py \
     --input_format list_of_text_files \
-    --input_file_list test.1line_transcription.lst  \
+    --input_file_list test_files.lst  \
     --model_path text_model/model.best.pt \
     --sample_max_len $len \
     --sample_window_size $FUTURE_WINDOW_SIZE
 ```
+
+The contents of each file are treated as a stream, so preexisting line breaks are ignored, and the output is segmented into lines according to the best hypothesis of the model.
+
+Decoding with an audio model follows the same principles, but now you also have to provide the file containing the paths of the audio feature files. Each audio feature file will contain N lines, N being the number of words of the corresponding text file. Each line provides white-space separated features for the corresponding word.
+
+```
+15 0 1
+27 1 0
+3 0 0
+17 0 0
+53 0 1
+56 1 0
+42 0 6
+25 6 0
+37 0 1
+10 1 0
+14 0 0
+24 0 0
+12 0 0
+10 0 0
+19 0 0
+```
+
+```
+ python decode_audio_model.py \
+     --input_format list_of_text_files \
+     --input_file_list test_files.lst  \
+     --input_audio_file_list test_files.features.lst \
+     --model_path audio_model/model.best.pt \
+     --sample_max_len $len \
+     --sample_window_size $FUTURE_WINDOW_SIZE
+ ```
