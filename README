@@ -1,5 +1,0 @@
-
-Version camera-ready EMNLP:
-    -Se ha añadido el argumento max-chunk-length. Hay que acabar de modificar los decode* files para que funcione.
-    -El debug que hay en beam_decode parace ser para comprobar cual es la greedy
-    -Hay que hacer un cleanup general de debugs y metodos que eran TO-DO
