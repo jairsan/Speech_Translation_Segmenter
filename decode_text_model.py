@@ -87,7 +87,7 @@ def decode_from_file(file_path, args, model, vocabulary, device):
 
     buffer = []
 
-    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    #When we reach the last word, we will always segment, so no need to eval
     for i in range(len(text)-window_size):
         buffer.append(text[i])
         sample = history + [text[i]] + text[i+1:i+window_size+1]
@@ -128,7 +128,7 @@ def beam_decode_from_file(file_path, args, model, vocabulary, device):
 
     cubeta.append((history, [[]], 0))
 
-    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    #When we reach the last word, we will always segment, so no need to eval
     for i in range(len(text)-window_size):
 
         cubeta2 = []
@@ -189,10 +189,6 @@ def decode_from_list_of_files(args, model, vocabulary, device):
                 decode_from_file(line.strip(), args, model, vocabulary, device)
 
 
-#TODO: Complete. This should decode only from stdin or server port. This is the true online version.
-def decode_from_stream(args, model, vocabulary):
-    raise NotImplementedError
-
 
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
@@ -211,7 +207,6 @@ if __name__ == "__main__":
     model.eval()
     if args.input_format == "sample_file":
         decode_from_sample_file(args, model, vocabulary, device)
-    elif args.input_format == "list_of_text_files":
-        decode_from_list_of_files(args, model, vocabulary, device)
     else:
-        decode_from_stream(args, model, vocabulary, device)
+        decode_from_list_of_files(args, model, vocabulary, device)
+        

@@ -35,7 +35,6 @@ def get_decision_and_probs(text_model,audio_model,sentence,audio_features, vocab
 
     prediction, _, _ = audio_model.forward(X_feas, text_feas, [len(tokens_i)])
 
-    #In the future, we should compute probs if we want to carry out search
     decision = torch.argmax(prediction,dim=1).detach().cpu().numpy().tolist()
     probs = torch.nn.functional.log_softmax(prediction, dim=1).detach().cpu().numpy()
 
@@ -70,7 +69,7 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
     buffer = []
     buffer_a = []
 
-    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    #When we reach the last word, we will always segment, so no need to eval
     for i in range(len(text)-window_size):
         buffer.append(text[i])
 
@@ -80,9 +79,6 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
 
         decision_t, probs = get_decision_and_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
         
-        #if args.debug:
-        #    print(probs)
-
         decision = decision_t[0]
         #if decision == 0 and len(buffer) < args.chunk_max_length:
         if decision == 0:
@@ -147,11 +143,12 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
     ghistory = copy.deepcopy(history)
     ghistory_a = copy.deepcopy(history_a)
 
-    #Cuando llegamos a la ultima palabra, vamos a cortar siempre, asi que no hace falta evaluar ese caso
+    #When we reach the last word, we will always segment, so no need to eval
     for i in range(len(text)-window_size):
 
 
         if args.debug:
+            #Debug to check that beam search is working
             sample = ghistory + [text[i]] + text[i + 1:i + window_size + 1]
             sample_a = ghistory_a + [audio_features[i]] + audio_features[i + 1:i + window_size + 1]
 
@@ -241,15 +238,6 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
 
     best_hypo[2][-1].extend(text[max(len(text)-window_size,0):])
     greedy_hypo[-1].extend(text[max(len(text)-window_size,0):])
-
-    if args.debug:
-        print("########")
-        print(best_hypo[2] == greedy_hypo)
-        print(greedy_hypo)
-        print(greedy_score)
-        print(best_hypo[2])
-        print(best_hypo[3])
-        print("########")
 
     for line in best_hypo[2]:
         print(" ".join(line))

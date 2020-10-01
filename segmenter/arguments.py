@@ -45,13 +45,11 @@ def add_model_arguments(parser):
                                                                "A sample with max_len=l and window_size=s "
                                                                "has (l - s - 1) previous history tokens. ")
 
-
-# TODO: Fix stream so that it only infers from stdin.
 def add_infer_arguments(parser):
     parser.add_argument("--model_path", type=str, help="Load this model", required=True)
     parser.add_argument("--beam", type=int, help="Use beam search, with beam of size b", default=1 )
     parser.add_argument("--chunk_max_length", type=int, help="Maximum length allowed for chunk. Higher numbers are truncated",default=9999)
-    parser.add_argument("--input_format",  choices=['sample_file', 'stream', 'list_of_text_files'], help="Input format for the decoding process. ", required=True)
+    parser.add_argument("--input_format",  choices=['sample_file', 'list_of_text_files'], help="Input format for the decoding process. ", required=True)
     parser.add_argument("--file", type=str, help="Infer from this sample file")
     parser.add_argument("--input_file_list", type=str, help="Infer from list of files.")
     parser.add_argument("--input_audio_file_list", type=str, help="Infer from list of files containing audio features.")
