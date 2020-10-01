@@ -95,7 +95,7 @@ def decode_from_file(file_path, args, model, vocabulary, device):
 
         decision = get_decision(model,sample,vocabulary, device)[0]
 
-        if decision == 0 and len(buffer) < args.chunk_max_length:
+        if decision == 0:
             history.pop(0)
             history.append(text[i])
         else:

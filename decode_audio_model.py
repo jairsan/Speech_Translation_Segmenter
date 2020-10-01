@@ -80,7 +80,6 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
         decision_t, probs = get_decision_and_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
         
         decision = decision_t[0]
-        #if decision == 0 and len(buffer) < args.chunk_max_length:
         if decision == 0:
             history.pop(0)
             history.append(text[i])
@@ -145,43 +144,6 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
 
     #When we reach the last word, we will always segment, so no need to eval
     for i in range(len(text)-window_size):
-
-
-        if args.debug:
-            #Debug to check that beam search is working
-            sample = ghistory + [text[i]] + text[i + 1:i + window_size + 1]
-            sample_a = ghistory_a + [audio_features[i]] + audio_features[i + 1:i + window_size + 1]
-
-            decision_k, probs = get_decision_and_probs(text_model, audio_model, sample, sample_a, vocabulary, device)
-            decision=decision_k[0]
-
-            greedy_hypo[-1].append(text[i])
-
-            if decision == 0:
-                ghistory.pop(0)
-                ghistory.append(text[i])
-
-                ghistory_a.pop(0)
-                ghistory_a.append(audio_features[i])
-
-                greedy_score += probs[0][0]
-            else:
-                ghistory.pop(0)
-                ghistory.pop(0)
-                ghistory.append(text[i])
-                ghistory.append("</s>")
-
-                ghistory_a.pop(0)
-                ghistory_a.pop(0)
-                ghistory_a.append(audio_features[i])
-                ghistory_a.append(FILLER_FEA)
-
-                greedy_hypo.append([])
-
-                greedy_score += probs[0][1]
-
-
-
         cubeta2 = []
         for j in range(len(cubeta)):
 
