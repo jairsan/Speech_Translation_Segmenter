@@ -95,7 +95,7 @@ def decode_from_file(file_path, args, model, vocabulary, device):
 
         decision = get_decision(model,sample,vocabulary, device)[0]
 
-        if decision == 0:
+        if decision == 0 and len(buffer) <= args.segment_max_size :
             history.pop(0)
             history.append(text[i])
         else:
@@ -123,10 +123,15 @@ def beam_decode_from_file(file_path, args, model, vocabulary, device):
 
     history = ["</s>"] * (max_len - window_size - 1)
 
-
+    #During beam decoding, we are going to use an unordered list for storing the hypos
     cubeta = []
 
+    #Each hypo is a tuple (model_history, segmented_sentences, score)
     cubeta.append((history, [[]], 0))
+
+    #Segmented_sentences is a list of lists
+    #Every time a split decision is taken, a new empty list is added
+    #Every time a non split decision is taken, the word is added to segmented_sentences
 
     #When we reach the last word, we will always segment, so no need to eval
     for i in range(len(text)-window_size):
@@ -149,8 +154,9 @@ def beam_decode_from_file(file_path, args, model, vocabulary, device):
             history_0.append(text[i])
 
             segmentation_history_0[-1].append(text[i])
-
-            cubeta2.append((history_0, segmentation_history_0, score + probs[0][0]))
+            
+            if len(segmentation_history_0[-1]) <= args.segment_max_size:
+                cubeta2.append((history_0, segmentation_history_0, score + probs[0][0]))
 
             # Split
             history_1 = copy.deepcopy(history)
@@ -167,8 +173,9 @@ def beam_decode_from_file(file_path, args, model, vocabulary, device):
 
             cubeta2.append((history_1, segmentation_history_1, score + probs[0][1]))
 
+        #Sort by scores and create the cubeta for next iteration
         cubeta2.sort(key=lambda hypo: hypo[2], reverse=True)
-        cubeta = cubeta2[:min(args.beam,len(cubeta2))]
+        cubeta = cubeta2[:min(args.beam,len(cubeta2)+1)]
 
 
     best_hypo = cubeta[0]

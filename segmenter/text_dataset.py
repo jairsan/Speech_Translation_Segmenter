@@ -3,9 +3,6 @@ import torch.utils.data as data
 import random
 import torch.nn as nn
 
-SEED=5
-
-
 class SegmentationTextDataset(data.Dataset):
 
     def __init__(self,file, vocab_dictionary, min_split_samples_batch_ratio=0.0, unk_noise_prob=0.0):
@@ -18,8 +15,6 @@ class SegmentationTextDataset(data.Dataset):
         # Keep count of how many of each class
         c0 = 0
         c1 = 0
-
-        random.seed(SEED)
 
         with open(file, encoding="utf-8") as f:
             targets = []

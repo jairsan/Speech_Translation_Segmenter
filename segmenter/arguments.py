@@ -19,7 +19,7 @@ def add_train_arguments(parser):
     parser.add_argument("--lr_reduce_factor", type=float, default=0.5)
     parser.add_argument("--unk_noise_prob", type=float, default=0.0, help = "Every word in a sample will have probability p to be replaced by \"<unk>\""
                                                                             "(Noise is applied every time a sample is drawn)" )
-
+    parser.add_argument("--seed", type=int, help="Random seed", default=1)
     parser.add_argument("--train_audio_feas_corpus", type=str, help="Training containing audio feas")
     parser.add_argument("--dev_audio_feas_corpus", type=str, help="Dev containing audio feas")
 
@@ -53,7 +53,5 @@ def add_infer_arguments(parser):
     parser.add_argument("--input_file_list", type=str, help="Infer from list of files.")
     parser.add_argument("--input_audio_file_list", type=str, help="Infer from list of files containing audio features.")
     parser.add_argument("--debug", action='store_true', help="Activate debug mode")
-
-
-
+    parser.add_argument("--segment_max_size", type=int, default=99999, help="Force split for segments longer than [segment_max_size]")
 

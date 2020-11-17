@@ -8,6 +8,7 @@ import torch.utils.data as data
 import torch.optim as optim
 import time, os, math
 import numpy as np
+import random
 
 from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
 
@@ -22,6 +23,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
+    
+    os.environ['PYTHONHASHSEED']=str(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = False
 
     vocabulary = vocab.VocabDictionary()
     vocabulary.create_from_count_file(args.vocabulary)
@@ -31,15 +40,15 @@ if __name__ == "__main__":
     if args.min_split_samples_batch_ratio > 0.0:
         sampler = data.WeightedRandomSampler(train_dataset.weights, len(train_dataset.weights))
 
-        train_dataloader = data.DataLoader(train_dataset, num_workers=3, batch_size=args.batch_size,
+        train_dataloader = data.DataLoader(train_dataset, num_workers=0, batch_size=args.batch_size,
                                            drop_last=True,
                                            collate_fn=text_dataset.collater, sampler=sampler)
     else:
-        train_dataloader = data.DataLoader(train_dataset, num_workers=3, batch_size=args.batch_size, shuffle=True, drop_last=True,
+        train_dataloader = data.DataLoader(train_dataset, num_workers=0, batch_size=args.batch_size, shuffle=True, drop_last=True,
                                            collate_fn=text_dataset.collater)
 
     dev_dataset = text_dataset.SegmentationTextDataset(args.dev_corpus, vocabulary)
-    dev_dataloader = data.DataLoader(dev_dataset, num_workers=3, batch_size=args.batch_size, shuffle=False, drop_last=False,
+    dev_dataloader = data.DataLoader(dev_dataset, num_workers=0, batch_size=args.batch_size, shuffle=False, drop_last=False,
                                      collate_fn=text_dataset.collater)
 
     if args.model_architecture == "ff_text":
@@ -82,6 +91,7 @@ if __name__ == "__main__":
             results = model.get_sentence_prediction(model_output,lengths, device)
 
             cost = loss(results, y)
+            
             cost.backward()
 
             epoch_cost += cost.detach().cpu().numpy()
@@ -122,6 +132,21 @@ if __name__ == "__main__":
             if args.lr_schedule == "reduce_on_plateau":
                 scheduler.step(f1)
 
+            if f1 > best_result:
+                if not os.path.exists(args.output_folder):
+                    os.makedirs(args.output_folder)
+                best_result = f1
+                best_epoch = epoch
+                torch.save({
+                    'version': "0.2",
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'vocabulary': vocabulary,
+                    'args' : args
+                }, args.output_folder + "/model.best.pt", pickle_protocol=4)
+
+
+
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
             if not os.path.exists(args.output_folder):
                 os.makedirs(args.output_folder)
@@ -132,17 +157,6 @@ if __name__ == "__main__":
                 'vocabulary': vocabulary,
                 'args' : args
             }, args.output_folder + "/model."+str(epoch)+".pt", pickle_protocol=4)
-
-            if f1 > best_result:
-                best_result = f1
-                best_epoch = epoch
-                torch.save({
-                    'version': "0.2",
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'vocabulary': vocabulary,
-                    'args' : args
-                }, args.output_folder + "/model.best.pt", pickle_protocol=4)
 
     print("Training finished.")
     print("Best checkpoint F1:",best_result, ", achieved at epoch:", best_epoch)

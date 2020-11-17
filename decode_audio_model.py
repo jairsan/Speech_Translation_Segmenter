@@ -80,7 +80,7 @@ def decode_from_file_pair(text_file_path,audio_file_path, args, text_model, audi
         decision_t, probs = get_decision_and_probs(text_model,audio_model,sample,sample_a,vocabulary, device)
         
         decision = decision_t[0]
-        if decision == 0:
+        if decision == 0 and len(buffer) <= args.segment_max_size:
             history.pop(0)
             history.append(text[i])
 
@@ -169,7 +169,8 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
 
             segmentation_history_0[-1].append(text[i])
 
-            cubeta2.append((history_0, history_a_0, segmentation_history_0, score + probs[0][0]))
+            if len(segmentation_history_0[-1]) <= args.segment_max_size:
+                cubeta2.append((history_0, history_a_0, segmentation_history_0, score + probs[0][0]))
 
 
             # Split
@@ -194,7 +195,7 @@ def beam_decode_from_file_pair(text_file_path,audio_file_path, args, text_model,
             cubeta2.append((history_1, history_a_1, segmentation_history_1, score + probs[0][1]))
 
         cubeta2.sort(key=lambda hypo: hypo[3], reverse=True)
-        cubeta = cubeta2[:min(args.beam,len(cubeta2))]
+        cubeta = cubeta2[:min(args.beam,len(cubeta2)+1)]
 
     best_hypo = cubeta[0]
 
