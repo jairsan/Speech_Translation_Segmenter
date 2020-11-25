@@ -1,13 +1,24 @@
 # Direct Segmentation Models for Streaming Speech Translation
-This repository contains the code of the paper "Direct Segmentation Models for Streaming Speech Translation".
+This repository contains the code of the paper [Direct Segmentation Models for Streaming Speech Translation](https://www.aclweb.org/anthology/2020.emnlp-main.206/).
 Please refer to the publication:
 ```
-@inproceedings{Sanchez2020,
-title = {Direct Segmentation Models for Streaming Speech Translation},
-author = {Javier Iranzo-S\'{a}nchez and Adri\`{a} Gim\'{e}nez and Joan Albert Silvestre-Cerd\`{a} and Pau Baquero-Arnal and Jorge Civera and Alfons Juan},
-year = {2020},
-booktitle = {2020 Conference on Empirical Methods in Natural Language Processing (EMNLP 2020)},
-
+@inproceedings{iranzo-sanchez-etal-2020-direct,
+    title = "Direct Segmentation Models for Streaming Speech Translation",
+    author = "Iranzo-S{\'a}nchez, Javier  and
+      Gim{\'e}nez Pastor, Adri{\`a}  and
+      Silvestre-Cerd{\`a}, Joan Albert  and
+      Baquero-Arnal, Pau  and
+      Civera Saiz, Jorge  and
+      Juan, Alfons",
+    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)",
+    month = nov,
+    year = "2020",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/2020.emnlp-main.206",
+    pages = "2599--2611",
+    abstract = "The cascade approach to Speech Translation (ST) is based on a pipeline that concatenates an Automatic Speech Recognition (ASR) system followed by a Machine Translation (MT) system. These systems are usually connected by a segmenter that splits the ASR output into hopefully, semantically self-contained chunks to be fed into the MT system. This is specially challenging in the case of streaming ST, where latency requirements must also be taken into account. This work proposes novel segmentation models for streaming ST that incorporate not only textual, but also acoustic information to decide when the ASR output is split into a chunk. An extensive and throughly experimental setup is carried out on the Europarl-ST dataset to prove the contribution of acoustic information to the performance of the segmentation model in terms of BLEU score in a streaming ST scenario. Finally, comparative results with previous work also show the superiority of the segmentation models proposed in this work.",
+}
 ```
 
 ## Overview
