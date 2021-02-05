@@ -1,7 +1,10 @@
-from segmenter import text_dataset,arguments,vocab
+from segmenter import text_dataset,raw_text_dataset,arguments,vocab
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
 from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
+from segmenter.models.bert_text_model import BERTTextModel
+from segmenter.models.xlm_roberta_text_model import XLMRobertaTextModel
 
+ 
 import argparse
 import torch
 import torch.utils.data as data
@@ -9,9 +12,8 @@ import torch.optim as optim
 import time, os, math
 import numpy as np
 import random
-
+import gpustat
 from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
-
 
 if __name__ == "__main__":
     start_prep = time.time()
@@ -28,37 +30,62 @@ if __name__ == "__main__":
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.enabled = False
+    
+    if False:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.enabled = False
+        os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+        dataset_workers = 1
+    else:
+        dataset_workers = 0
 
     vocabulary = vocab.VocabDictionary()
     vocabulary.create_from_count_file(args.vocabulary)
-
-    train_dataset = text_dataset.SegmentationTextDataset(args.train_corpus, vocabulary, args.min_split_samples_batch_ratio, args.unk_noise_prob)
+    
+    if args.transformer_architecture != None:
+        train_dataset = raw_text_dataset.SegmentationRawTextDataset(args.train_corpus, args.min_split_samples_batch_ratio, args.unk_noise_prob)
+    else:
+        train_dataset = text_dataset.SegmentationTextDataset(args.train_corpus, vocabulary, args.min_split_samples_batch_ratio, args.unk_noise_prob)
 
     if args.min_split_samples_batch_ratio > 0.0:
-        sampler = data.WeightedRandomSampler(train_dataset.weights, len(train_dataset.weights))
+        if args.samples_per_random_epoch == -1:
+            samples_to_draw = len(train_dataset.weights)
+        else:
+             samples_to_draw = args.samples_per_random_epoch
 
-        train_dataloader = data.DataLoader(train_dataset, num_workers=0, batch_size=args.batch_size,
+        sampler = data.WeightedRandomSampler(train_dataset.weights, samples_to_draw)
+
+        train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
                                            drop_last=True,
-                                           collate_fn=text_dataset.collater, sampler=sampler)
+                                           collate_fn=train_dataset.collater, sampler=sampler)
     else:
-        train_dataloader = data.DataLoader(train_dataset, num_workers=0, batch_size=args.batch_size, shuffle=True, drop_last=True,
-                                           collate_fn=text_dataset.collater)
+        train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size, shuffle=True, drop_last=True,
+                                           collate_fn=train_dataset.collater)
 
-    dev_dataset = text_dataset.SegmentationTextDataset(args.dev_corpus, vocabulary)
-    dev_dataloader = data.DataLoader(dev_dataset, num_workers=0, batch_size=args.batch_size, shuffle=False, drop_last=False,
-                                     collate_fn=text_dataset.collater)
+    if args.transformer_architecture != None:
+        dev_dataset = raw_text_dataset.SegmentationRawTextDataset(args.dev_corpus)
+    else:
+        dev_dataset = text_dataset.SegmentationTextDataset(args.dev_corpus, vocabulary)
 
-    if args.model_architecture == "ff_text":
+    dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size, shuffle=False, drop_last=False,
+                                     collate_fn=train_dataset.collater)
+
+    if args.transformer_architecture !=None:
+        archetype, _ = args.transformer_architecture.split(":")
+        if archetype == "bert":
+            model = BERTTextModel(args).to(device)
+        elif archetype == "xlm-roberta":
+            model = XLMRobertaTextModel(args).to(device)
+        else:
+            raise Exception
+    elif args.model_architecture == "ff_text":
         model = SimpleRNNFFTextModel(args, vocabulary).to(device)
     else:
         model = SimpleRNNTextModel(args, vocabulary).to(device)
 
     if args.optimizer == "adam":
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    else:
+
         optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
     if args.lr_schedule == "reduce_on_plateau":
@@ -84,12 +111,17 @@ if __name__ == "__main__":
 
         model.train()
         for x, src_lengths, y in train_dataloader:
+            if args.transformer_architecture !=None:
+                #Transformer model does this internally
+                y = y.to(device)
+            else:
+                x, y = x.to(device), y.to(device)
 
-            x, y = x.to(device), y.to(device)
-            model_output,lengths, hn = model.forward(x, src_lengths)
+            model_output,lengths, hn = model.forward(x, src_lengths, device)
 
             results = model.get_sentence_prediction(model_output,lengths, device)
-
+            
+            #print(results, y)
             cost = loss(results, y)
             
             cost.backward()
@@ -98,6 +130,8 @@ if __name__ == "__main__":
             update+=1
             if update % args.log_every == 0:
                 print("Epoch ", epoch, ", update ", update, "/",len(train_dataloader),", cost: ", cost.detach().cpu().numpy(),sep="")
+            #if args.checkpoint_every > 0 and update % args.checkpoint_every == 0:
+            
             optimizer.step()
             optimizer.zero_grad()
         print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
@@ -108,9 +142,13 @@ if __name__ == "__main__":
             epoch_cost = 0
             model.eval()
             for x, src_lengths, y in dev_dataloader:
+                if args.transformer_architecture !=None:
+                    #Transformer model does this internally
+                    y = y.to(device)
+                else:
+                    x, y = x.to(device), y.to(device)
 
-                x, y = x.to(device), y.to(device)
-                model_output, lengths, hn = model.forward(x, src_lengths)
+                model_output, lengths, hn = model.forward(x, src_lengths, device)
 
                 results = model.get_sentence_prediction(model_output, lengths, device)
                 yhat = torch.argmax(results,dim=1)

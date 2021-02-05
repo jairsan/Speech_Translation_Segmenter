@@ -4,7 +4,8 @@ from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
 from segmenter.models.rnn_ff_audio_text_model import RNNFFAudioTextModel
 from segmenter.models.rnn_ff_audio_text_feas_copy_model import RNNFFAudioTextFeasCopyModel
-
+from segmenter.models.bert_text_model import BERTTextModel
+from segmenter.models.xlm_roberta_text_model import XLMRobertaTextModel
 
 def load_text_model(args):
 
@@ -13,14 +14,26 @@ def load_text_model(args):
     saved_model_args = checkpoint['args']
 
     vocabulary = checkpoint['vocabulary']
+    
+    try:
+        transformer_arch = saved_model_args.transformer_architecture 
+    except:
+        transformer_arch = None
 
-    if saved_model_args.model_architecture == "ff_text":
+    if transformer_arch != None:
+        archetype, _ = saved_model_args.transformer_architecture.split(":")
+        if archetype == "bert":
+            model = BERTTextModel(saved_model_args)
+        elif archetype == "xlm-roberta":
+            model = XLMRobertaTextModel(saved_model_args)
+        else:
+            raise Exception
+    elif saved_model_args.model_architecture == "ff_text":
         model = SimpleRNNFFTextModel(saved_model_args, vocabulary)
     else:
         model = SimpleRNNTextModel(saved_model_args, vocabulary)
 
     model.load_state_dict(checkpoint['model_state_dict'])
-
     return model, vocabulary, saved_model_args
 
 def load_text_and_audio_model(args):

@@ -24,7 +24,7 @@ class SimpleRNNTextModel(nn.Module):
 
         self.linear1 = nn.Linear(args.rnn_layer_size, args.n_classes, bias=True)
 
-    def forward(self, x, src_lengths, h0=None):
+    def forward(self, x, src_lengths, device=None, h0=None):
 
         x, lengths, hn = self.extract_features(x, src_lengths, h0)
         x = self.linear1(x)

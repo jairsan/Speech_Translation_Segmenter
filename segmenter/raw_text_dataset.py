@@ -3,15 +3,13 @@ import torch.utils.data as data
 import random
 import torch.nn as nn
 
-class SegmentationTextDataset(data.Dataset):
+class SegmentationRawTextDataset(data.Dataset):
 
-    def __init__(self,file, vocab_dictionary, min_split_samples_batch_ratio=0.0, unk_noise_prob=0.0):
+    def __init__(self,file, min_split_samples_batch_ratio=0.0, unk_noise_prob=0.0):
         # Samples is a list of tuples. Element 0 is the Tensor of indices. Element 1 is the target
         self.samples = []
-        self.vocab_dictionary = vocab_dictionary
         self.min_split_samples_batch_ratio = min_split_samples_batch_ratio
         self.unk_noise_prob = unk_noise_prob
-        self.unk_index = vocab_dictionary.get_index("<unk>")
         # Keep count of how many of each class
         c0 = 0
         c1 = 0
@@ -28,10 +26,7 @@ class SegmentationTextDataset(data.Dataset):
 
                 tokens_i = []
 
-                for token in tokens:
-                    tokens_i.append(vocab_dictionary.get_index(token))
-
-                self.samples.append((torch.LongTensor(tokens_i),target))
+                self.samples.append((tokens,target))
 
                 if target == 0:
                     c0 += 1
@@ -72,7 +67,7 @@ class SegmentationTextDataset(data.Dataset):
 
         for i in range(len(item)):
             if random.random() <= self.unk_noise_prob:
-                item[i] = self.unk_index
+                item[i] = "<unk>"
 
         return item
 
@@ -85,7 +80,6 @@ class SegmentationTextDataset(data.Dataset):
         ys = [item[1] for item in batch]
         src_lengths = [len(x) for x in xs]
 
-        X = nn.utils.rnn.pad_sequence(xs,batch_first=True)
         Y = torch.LongTensor(ys)
 
-        return X, src_lengths, Y
+        return xs, src_lengths, Y
