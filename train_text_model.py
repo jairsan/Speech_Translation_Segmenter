@@ -85,7 +85,8 @@ if __name__ == "__main__":
         model = SimpleRNNTextModel(args, vocabulary).to(device)
 
     if args.optimizer == "adam":
-
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.adam_b1, args.adam_b2), eps=args.adam_eps)
+    else:
         optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
     if args.lr_schedule == "reduce_on_plateau":
@@ -130,10 +131,9 @@ if __name__ == "__main__":
             update+=1
             if update % args.log_every == 0:
                 print("Epoch ", epoch, ", update ", update, "/",len(train_dataloader),", cost: ", cost.detach().cpu().numpy(),sep="")
-            #if args.checkpoint_every > 0 and update % args.checkpoint_every == 0:
-            
-            optimizer.step()
-            optimizer.zero_grad()
+            if (update % args.gradient_accumulation == 0):
+                optimizer.step()
+                optimizer.zero_grad()
         print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
 
         with torch.no_grad():

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import argparse
 import copy
+from segmenter.models.bert_text_model import BERTTextModel
+from segmenter.models.xlm_roberta_text_model import XLMRobertaTextModel
 
 from segmenter import arguments, utils
 
@@ -49,6 +51,27 @@ def get_probs(model,sentence,vocab_dictionary, device):
 
     return torch.nn.functional.log_softmax(results, dim=1).detach().cpu().numpy()
 
+def get_decision_raw(model, sentence, device):
+    x = [sentence]
+    model_output, lengths, hn = model.forward(x, [len(x)], device)
+
+    results = model.get_sentence_prediction(model_output, lengths, device)
+
+    decision = torch.argmax(results,dim=1).detach().cpu().numpy().tolist()
+
+    return decision
+
+def get_probs_raw(model, sentence, device):
+    x = [sentence]
+    model_output, lengths, hn = model.forward(x, [len(x)], device)
+
+    results = model.get_sentence_prediction(model_output, lengths, device)
+
+    decision = torch.nn.functional.log_softmax(results,dim=1).detach().cpu().numpy().tolist()
+
+    return decision
+
+
 
 def decode_from_sample_file(args, model, vocabulary, device):
     targets = []
@@ -92,8 +115,11 @@ def decode_from_file(file_path, args, model, vocabulary, device):
         buffer.append(text[i])
         sample = history + [text[i]] + text[i+1:i+window_size+1]
         assert len(sample) == max_len
-
-        decision = get_decision(model,sample,vocabulary, device)[0]
+        
+        if isinstance(model,BERTTextModel) or isinstance(model, XLMRobertaTextModel):
+            decision = get_decision_raw(model,sample, device)[0]
+        else:
+            decision = get_decision(model,sample,vocabulary, device)[0]
 
         if decision == 0 and len(buffer) <= args.segment_max_size :
             history.pop(0)
