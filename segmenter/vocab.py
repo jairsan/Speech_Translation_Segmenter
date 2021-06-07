@@ -1,12 +1,15 @@
 class VocabDictionary:
-    def __init__(self, unk="<unk>", pad="<pad>"):
+    def __init__(self, include_special=True,unk="<unk>", pad="<pad>"):
         self.dictionary = {}
         self.tokens = []
-        self.unk = unk
-        self.pad = pad
-        self.pad_index = self.add_symbol(self.pad)
-        self.unk_index = self.add_symbol(self.unk)
-
+        if include_special:
+            self.unk = unk
+            self.pad = pad
+            self.pad_index = self.add_symbol(self.pad)
+            self.unk_index = self.add_symbol(self.unk)
+        else:
+            self.pad_index = None
+            self.unk_index = None
     def __len__(self):
         return len(self.dictionary)
 

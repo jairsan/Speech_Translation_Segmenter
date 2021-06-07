@@ -4,6 +4,7 @@ def add_train_arguments(parser):
     parser.add_argument("--dev_corpus", type=str, help="Dev text file", required=True)
     parser.add_argument("--output_folder", type=str, help="Save model training here", required=True)
     parser.add_argument("--vocabulary", type=str, help="Vocabulary to be used by the network", required=True)
+    parser.add_argument("--classes_vocabulary", type=str, help="Dictionary of <class> <count> used for multiclass problems")
     parser.add_argument("--epochs", type=int, help="Train the model this number of epochs",default=40)
     parser.add_argument("--batch_size", type=int, help="Train batch size", default=256)
     parser.add_argument("--split_weight", type=float, help="Weight given to split samples "
@@ -11,6 +12,7 @@ def add_train_arguments(parser):
     parser.add_argument("--min_split_samples_batch_ratio", type=float, help="Upsample split samples (class 1) so that each"
                                                                           "batch contains, on average, this ratio of split vs non-split", default=0.3)
     parser.add_argument("--gradient_accumulation", type=int, default=1, help="Perform gradiend update every [gradient_accumulation] batches")
+    parser.add_argument("--sampling_temperature", type=float, default=1, help="Sampling temperature used for multiclass problems")
     parser.add_argument("--samples_per_random_epoch", type=int, help="If using upsampling, how many samples we wish to draw per epoch. If -1, draw all", default=-1)
     parser.add_argument("--log_every", type=int, default=100, help="Log training statistics every n updates")
     parser.add_argument("--checkpoint_interval", type=int, default=1, help="Save model every [checkpoint_interval] epochs")
@@ -40,7 +42,7 @@ def add_model_arguments(parser):
     parser.add_argument("--embedding_size", type=int, default=256, help="Size of the embedding")
     parser.add_argument("--feedforward_layers", type=int, default=2, help="Number of feedforward layers (Only for ff architecture)")
     parser.add_argument("--feedforward_size", type=int, default=128, help="Size of feedforward layers (Only for ff architecture)")
-    parser.add_argument("--n_classes", type=int, choices=[2], default=2, help="Number of classification targets")
+    parser.add_argument("--n_classes", type=int, default=2, help="Number of classification targets")
     parser.add_argument("--dropout", type=float, default=0.3)
     parser.add_argument("--model_architecture", type=str, choices = ["simple-text", "ff-text", "ff-audio-text",
                                                                      "ff-audio-text-copy-feas"], default = "ff-text",

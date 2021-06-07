@@ -8,6 +8,8 @@ class SimpleRNNTextModel(nn.Module):
     def __init__(self,args,dictionary):
         super(SimpleRNNTextModel, self).__init__()
 
+        self.args = args
+
         self.embedding = nn.Embedding(
             num_embeddings=len(dictionary),
             embedding_dim=args.embedding_size,
@@ -50,11 +52,11 @@ class SimpleRNNTextModel(nn.Module):
         for each sample in the batch.
         """
         select = lengths - torch.ones(lengths.shape, dtype=torch.long)
-
+        
         select = select.to(device)
 
         indices = torch.unsqueeze(select, 1)
-        indices = torch.unsqueeze(indices, 2).repeat(1, 1, 2)
+        indices = torch.unsqueeze(indices, 2).repeat(1, 1, self.args.n_classes)
         results = torch.gather(model_output, 1, indices).squeeze(1)
 
         return results

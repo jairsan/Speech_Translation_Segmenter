@@ -31,7 +31,7 @@ class SegmentationTextDataset(data.Dataset):
                 for token in tokens:
                     tokens_i.append(vocab_dictionary.get_index(token))
 
-                self.samples.append((torch.LongTensor(tokens_i),target))
+                self.samples.append((torch.IntTensor(tokens_i),target))
 
                 if target == 0:
                     c0 += 1
@@ -85,7 +85,7 @@ class SegmentationTextDataset(data.Dataset):
         ys = [item[1] for item in batch]
         src_lengths = [len(x) for x in xs]
 
-        X = nn.utils.rnn.pad_sequence(xs,batch_first=True)
+        X = nn.utils.rnn.pad_sequence(xs,batch_first=True).long()
         Y = torch.LongTensor(ys)
 
         return X, src_lengths, Y

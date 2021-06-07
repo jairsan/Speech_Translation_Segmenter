@@ -7,7 +7,7 @@ class SimpleRNNFFTextModel(nn.Module):
 
     def __init__(self,args,dictionary):
         super(SimpleRNNFFTextModel, self).__init__()
-
+        self.args = args
         self.embedding = nn.Embedding(
             num_embeddings=len(dictionary),
             embedding_dim=args.embedding_size,
