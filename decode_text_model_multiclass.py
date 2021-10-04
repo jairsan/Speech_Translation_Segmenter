@@ -63,7 +63,7 @@ def step(history, current_word, future_window, max_len, window_size, model, voca
     if len(history) > (max_len - window_size - 1):
         history=history[-(max_len - window_size - 1):]
 
-    return output_word, sign, history
+    return output_word, sign, history, casing
 
 def decode_from_file(file_path, args, model, vocabulary, classes_vocabulary, device):
 
@@ -87,18 +87,23 @@ def decode_from_file(file_path, args, model, vocabulary, classes_vocabulary, dev
         future_window = text[i+1: min(i+ window_size + 1, len(text)) ]
         if len(future_window) < window_size:
             future_window = future_window + ["<pad>"] * (window_size - len(future_window))
-        out_word, sign, history = step(history, current_word, future_window, max_len, window_size, model, vocabulary, classes_vocabulary, device)
+        out_word, sign, history, casing = step(history, current_word, future_window, max_len, window_size, model, vocabulary, classes_vocabulary, device)
         
         if is_first:
             out_word= out_word[0].upper() + out_word[1:]
             is_first = False
 
         if sign == ".":
-            print(out_word, end="\n")
+            if args.return_type == "words":
+                print(out_word, end="\n")
+            else:
+                print(casing, end=" ")
             is_first = True
         else:
-            print(out_word, end=" ")
-
+            if args.return_type == "words":
+                print(out_word, end=" ")
+            else:
+                print(casing, end=" ")
 def decode_from_list_of_files(args, model, vocabulary, classes_vocabulary, device):
     with open(args.input_file_list) as f_lst:
         for line in f_lst:
@@ -112,6 +117,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     arguments.add_infer_arguments(parser)
+    arguments.add_multiclass_infer_arguments(parser)
     arguments.add_model_arguments(parser)
     args = parser.parse_args()
 

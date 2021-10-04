@@ -53,6 +53,9 @@ def add_model_arguments(parser):
                                                                "A sample with max_len=l and window_size=s "
                                                                "has (l - s - 1) previous history tokens. ")
 
+def add_multiclass_infer_arguments(parser):
+    parser.add_argument("--return_type", choices=['casing', 'words'], default="words")
+
 def add_infer_arguments(parser):
     parser.add_argument("--model_path", type=str, help="Load this model", required=True)
     parser.add_argument("--beam", type=int, help="Use beam search, with beam of size b", default=1 )

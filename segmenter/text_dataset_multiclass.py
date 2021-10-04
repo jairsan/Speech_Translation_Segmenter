@@ -36,26 +36,24 @@ class SegmentationTextDatasetMulticlass(data.Dataset):
                 total_counts += 1
                 targets.append(target)
 
+        pseudo_probs = {}
+        per_sample_probs = {}
+        tot_pseudo = 0
+        for cls in list(self.classes_dictionary.dictionary.keys()):
+            if cls != "<pad>" and cls != "<unk>":
+                cls = self.classes_dictionary.get_index(cls)
+                cls_pseudo = (counts[cls] / total_counts) ** (1 / sampling_temperature)
+                pseudo_probs[cls] = cls_pseudo
+                tot_pseudo += cls_pseudo
+        for cls in list(self.classes_dictionary.dictionary.keys()):
+            if cls != "<pad>" and cls != "<unk>":
+                cls = self.classes_dictionary.get_index(cls)
+                cls_prob = pseudo_probs[cls] / tot_pseudo
+                self.per_sample_probs[cls] = cls_prob / counts[cls]
 
-        if sampling_temperature > 1.0 :
-            pseudo_probs = {}
-            per_sample_probs = {}
-            tot_pseudo = 0
-            for cls in list(self.classes_dictionary.dictionary.keys()):
-                if cls != "<pad>" and cls != "<unk>":
-                    cls = self.classes_dictionary.get_index(cls)
-                    cls_pseudo = (counts[cls] / total_counts) ** (1 / sampling_temperature)
-                    pseudo_probs[cls] = cls_pseudo
-                    tot_pseudo += cls_pseudo
-            for cls in list(self.classes_dictionary.dictionary.keys()):
-                if cls != "<pad>" and cls != "<unk>":
-                    cls = self.classes_dictionary.get_index(cls)
-                    cls_prob = pseudo_probs[cls] / tot_pseudo
-                    self.per_sample_probs[cls] = cls_prob / counts[cls]
+        self.weights = [ self.per_sample_probs[c] for c in targets]
 
-            self.weights = [ self.per_sample_probs[c] for c in targets]
-
-            assert len(self.weights) == len(self.samples)
+        assert len(self.weights) == len(self.samples)
     def __len__(self):
         return len(self.samples)
 

@@ -158,6 +158,8 @@ if __name__ == "__main__":
 
             print("Epoch ", epoch, ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
             print("Dev Accuracy:", accuracy_score(true_l, predicted_l))
+            true_l = [ classes_vocabulary.tokens[idx] for idx in true_l] 
+            predicted_l = [ classes_vocabulary.tokens[idx] for idx in predicted_l] 
             precision, recall, f1, _ = precision_recall_fscore_support(true_l, predicted_l, average='macro')
             print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
             print(classification_report(true_l, predicted_l))
