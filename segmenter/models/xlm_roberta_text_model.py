@@ -1,20 +1,21 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import XLMRobertaTokenizer, XLMRobertaForSequenceClassification
+from transformers import XLMRobertaTokenizer, XLMRobertaForSequenceClassification, XLMRobertaConfig
 
 class XLMRobertaTextModel(nn.Module):
 
     def __init__(self,args):
         super(XLMRobertaTextModel, self).__init__()
-        
-        self.transformer_model = XLMRobertaForSequenceClassification.from_pretrained(args.transformer_architecture.split(":")[1], return_dict=True)
+        #Instad of manually defining parameters, could alsoc reate a XLMRobertaConfig.from_pretained, and then fed it to the model
+        self.transformer_model = XLMRobertaForSequenceClassification.from_pretrained(args.transformer_architecture.split(":")[1], return_dict=True, num_labels=args.n_classes)
         self.tokenizer = XLMRobertaTokenizer.from_pretrained(args.transformer_architecture.split(":")[1])
         #self.tokenizer.add_special_tokens({'additional_special_tokens':['[NO_CONTEXT]']})
 
         self.window_size = args.sample_window_size
 
         self.embedding_dropout = torch.nn.Dropout(p=args.dropout)
+
 
     def forward(self, x, src_lengths, device):
         

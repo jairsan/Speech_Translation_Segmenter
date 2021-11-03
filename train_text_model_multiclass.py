@@ -1,4 +1,4 @@
-from segmenter import text_dataset,text_dataset_multiclass,raw_text_dataset,arguments,vocab
+from segmenter import text_dataset,text_dataset_multiclass,raw_text_dataset,raw_text_dataset_multiclass,arguments,vocab
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
 from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
 from segmenter.models.bert_text_model import BERTTextModel
@@ -41,35 +41,18 @@ if __name__ == "__main__":
         dataset_workers = 0
 
     vocabulary = vocab.VocabDictionary()
-    vocabulary.create_from_count_file(args.vocabulary)
+    if args.transformer_architecture == None:
+        vocabulary.create_from_count_file(args.vocabulary, args.vocabulary_max_size)
     classes_vocabulary = vocab.VocabDictionary(include_special=False)
     classes_vocabulary.create_from_count_file(args.classes_vocabulary)
 
     if args.transformer_architecture != None:
-        raise Exception
-        train_dataset = raw_text_dataset.SegmentationRawTextDataset(args.train_corpus, args.min_split_samples_batch_ratio, args.unk_noise_prob)
+        dev_dataset = raw_text_dataset_multiclass.SegmentationRawTextDatasetMulticlass(args.dev_corpus, classes_vocabulary)
     else:
-        train_dataset = text_dataset_multiclass.SegmentationTextDatasetMulticlass(args.train_corpus, vocabulary, classes_vocabulary, args.sampling_temperature)
-
-    if args.samples_per_random_epoch == -1:
-        samples_to_draw = len(train_dataset.weights)
-    else:
-        samples_to_draw = args.samples_per_random_epoch
-
-    sampler = data.WeightedRandomSampler(train_dataset.weights, samples_to_draw)
-
-    train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
-                                       drop_last=True,
-                                       collate_fn=train_dataset.collater, sampler=sampler)
-
-    if args.transformer_architecture != None:
-        raise Exception
-        dev_dataset = raw_text_dataset.SegmentationRawTextDataset(args.dev_corpus)
-    else:
-        dev_dataset = text_dataset_multiclass.SegmentationTextDatasetMulticlass(args.train_corpus, vocabulary, classes_vocabulary)
+        dev_dataset = text_dataset_multiclass.SegmentationTextDatasetMulticlass(args.dev_corpus, vocabulary, classes_vocabulary)
 
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size, shuffle=False, drop_last=False,
-                                     collate_fn=train_dataset.collater)
+                                     collate_fn=dev_dataset.collater)
 
     if args.transformer_architecture !=None:
         archetype, _ = args.transformer_architecture.split(":")
@@ -100,7 +83,19 @@ if __name__ == "__main__":
 
     best_result = -math.inf
     best_epoch = -math.inf
+
+    train_chunks = []
+    if args.use_train_chunks_from_list != None:
+        with open(args.use_train_chunks_from_list) as filfil:
+            for line in filfil:
+                file_path = line.strip()
+                train_chunks.append(file_path)
+    else:
+        train_chunks.append(args.train_corpus)
+
     for epoch in range(1, args.epochs):
+
+
         optimizer.zero_grad()
 
         epoch_cost = 0
@@ -108,29 +103,99 @@ if __name__ == "__main__":
         update = 0
 
         model.train()
-        for x, src_lengths, y in train_dataloader:
-            if args.transformer_architecture !=None:
-                #Transformer model does this internally
-                y = y.to(device)
+
+        #Iterate over all chunks
+        for i in range(len(train_chunks)):
+
+            optimizer.zero_grad()
+            model.train()
+
+            if args.transformer_architecture != None:
+                train_dataset = raw_text_dataset_multiclass.SegmentationRawTextDatasetMulticlass(train_chunks[i], classes_vocabulary, args.sampling_temperature)
             else:
-                x, y = x.to(device), y.to(device)
+                train_dataset = text_dataset_multiclass.SegmentationTextDatasetMulticlass(train_chunks[i], vocabulary, classes_vocabulary, args.sampling_temperature)
 
-            model_output,lengths, hn = model.forward(x, src_lengths, device)
+            sampler = data.WeightedRandomSampler(train_dataset.weights, len(train_dataset.weights))
 
-            results = model.get_sentence_prediction(model_output,lengths, device)
- 
-            cost = loss(results, y)
-            
-            cost.backward()
+            train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
+                                       drop_last=True,
+                                       collate_fn=train_dataset.collater, sampler=sampler)
 
-            epoch_cost += cost.detach().cpu().numpy()
-            update+=1
-            if update % args.log_every == 0:
-                print("Epoch ", epoch, ", update ", update, "/",len(train_dataloader),", cost: ", cost.detach().cpu().numpy(),sep="")
-            if (update % args.gradient_accumulation == 0):
-                optimizer.step()
-                optimizer.zero_grad()
-        print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
+            for x, src_lengths, y in train_dataloader:
+                if args.transformer_architecture !=None:
+                    #Transformer model does this internally
+                    y = y.to(device)
+                else:
+                    x, y = x.to(device), y.to(device)
+
+                model_output,lengths, hn = model.forward(x, src_lengths, device)
+
+                results = model.get_sentence_prediction(model_output,lengths, device)
+
+                #print(results, y)
+     
+                cost = loss(results, y)
+                
+                cost.backward()
+
+                epoch_cost += cost.detach().cpu().numpy()
+                update+=1
+                if update % args.log_every == 0:
+                    print("Epoch ", epoch, " chunk ", i + 1, ", update ", update,", cost: ", cost.detach().cpu().numpy(),sep="")
+                if (update % args.gradient_accumulation == 0):
+                    #a = model.parameters()
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    #b = model.parameters()
+                    #print(a[0])
+            print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
+
+            #Should change to i + 1
+            if args.checkpoint_every_n_chunks != None  and i % args.checkpoint_every_n_chunks == 0:
+                with torch.no_grad():
+                    predicted_l = []
+                    true_l = []
+                    epoch_cost = 0
+                    model.eval()
+                    for x, src_lengths, y in dev_dataloader:
+                        if args.transformer_architecture !=None:
+                            #Transformer model does this internally
+                            y = y.to(device)
+                        else:
+                            x, y = x.to(device), y.to(device)
+
+                        model_output, lengths, hn = model.forward(x, src_lengths, device)
+
+                        results = model.get_sentence_prediction(model_output, lengths, device)
+                        yhat = torch.argmax(results,dim=1)
+
+
+                        predicted_l.extend(yhat.detach().cpu().numpy().tolist())
+                        true_l.extend(y.detach().cpu().numpy().tolist())
+
+                        cost = loss(results, y)
+                        epoch_cost += cost.detach().cpu().numpy()
+
+
+                    print("Epoch ", epoch, "chunk ", str(i), ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
+                    print("Dev Accuracy:", accuracy_score(true_l, predicted_l))
+                    true_l = [ classes_vocabulary.tokens[idx] for idx in true_l] 
+                    predicted_l = [ classes_vocabulary.tokens[idx] for idx in predicted_l] 
+                    precision, recall, f1, _ = precision_recall_fscore_support(true_l, predicted_l, average='macro')
+                    print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
+                    print(classification_report(true_l, predicted_l))
+
+                    if not os.path.exists(args.output_folder):
+                        os.makedirs(args.output_folder)
+     
+                    torch.save({
+                        'version': "0.3",
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'vocabulary': vocabulary,
+                        'classes_vocabulary': classes_vocabulary,
+                        'args' : args
+                    }, args.output_folder + "/model." + str(epoch) + "." + str(i) + ".pt", pickle_protocol=4)
 
         with torch.no_grad():
             predicted_l = []

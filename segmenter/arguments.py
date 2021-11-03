@@ -1,21 +1,24 @@
 def add_train_arguments(parser):
     # Model parameters
     parser.add_argument("--train_corpus", type=str, help="Training text file", required=True)
+    parser.add_argument("--use_train_chunks_from_list", type=str, help="Ignore train_corpus. Data has been chunked into files. This arg points to a file containing the name of 1 chunk per line")
     parser.add_argument("--dev_corpus", type=str, help="Dev text file", required=True)
     parser.add_argument("--output_folder", type=str, help="Save model training here", required=True)
     parser.add_argument("--vocabulary", type=str, help="Vocabulary to be used by the network", required=True)
+    parser.add_argument("--vocabulary_max_size", type=int, help="Use up to this number of vocabulary words", default=None)
     parser.add_argument("--classes_vocabulary", type=str, help="Dictionary of <class> <count> used for multiclass problems")
     parser.add_argument("--epochs", type=int, help="Train the model this number of epochs",default=40)
     parser.add_argument("--batch_size", type=int, help="Train batch size", default=256)
     parser.add_argument("--split_weight", type=float, help="Weight given to split samples "
                                                            "(Class 1). No split (Class 0) weight is 1)", default=1)
-    parser.add_argument("--min_split_samples_batch_ratio", type=float, help="Upsample split samples (class 1) so that each"
-                                                                          "batch contains, on average, this ratio of split vs non-split", default=0.3)
+    parser.add_argument("--min_split_samples_batch_ratio", type=float, help="For 2 class classification, upsample split samples (class 1) so that each"
+                                                                          "batch contains, on average, this ratio of split vs non-split")
     parser.add_argument("--gradient_accumulation", type=int, default=1, help="Perform gradiend update every [gradient_accumulation] batches")
     parser.add_argument("--sampling_temperature", type=float, default=1, help="Sampling temperature used for multiclass problems")
     parser.add_argument("--samples_per_random_epoch", type=int, help="If using upsampling, how many samples we wish to draw per epoch. If -1, draw all", default=-1)
     parser.add_argument("--log_every", type=int, default=100, help="Log training statistics every n updates")
     parser.add_argument("--checkpoint_interval", type=int, default=1, help="Save model every [checkpoint_interval] epochs")
+    parser.add_argument("--checkpoint_every_n_chunks", type=int, help="Save and eval model every time [checkpoint_every_n_chunks] chunks have been processed")
     parser.add_argument("--optimizer", choices=['sgd', 'adam'], default="adam")
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--lr_schedule", choices=['fixed', 'reduce_on_plateau'], default="reduce_on_plateau")
