@@ -139,7 +139,9 @@ if __name__ == "__main__":
                     curr_time = time.time()
                     diff_t = curr_time - last_time
                     last_time = curr_time
-                    print("Epoch ", epoch, " chunk ", i + 1, ", update ", update,", cost: ", cost.detach().cpu().numpy(), ", batches per second: ", str( float(args.log_every) / float(diff)), sep="")
+                    print("Epoch ", epoch, " chunk ", i + 1, ", update ", update,", cost: ",
+                          cost.detach().cpu().numpy(), ", batches per second: ",
+                          str( float(args.log_every) / float(diff_t)), sep="")
                 if (update % args.gradient_accumulation == 0):
                     #a = model.parameters()
                     optimizer.step()
