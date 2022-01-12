@@ -31,14 +31,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     
-    if False:
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.enabled = False
-        os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-        dataset_workers = 1
-    else:
-        dataset_workers = 0
+    dataset_workers = 2
 
     vocabulary = vocab.VocabDictionary()
     if args.transformer_architecture == None:
