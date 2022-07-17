@@ -79,7 +79,7 @@ if __name__ == "__main__":
             model = XLMRobertaTextModel(args).to(device)
         else:
             raise Exception
-    elif args.model_architecture == "ff_text":
+    elif args.model_architecture == "ff-text":
         model = SimpleRNNFFTextModel(args, vocabulary).to(device)
     else:
         model = SimpleRNNTextModel(args, vocabulary).to(device)
