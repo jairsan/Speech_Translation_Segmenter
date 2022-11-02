@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
-    name='Speech_Translation_Segmenter',
-    version='0.1.0',
+    name='ds-segmenter',
+    version='pre0.2.0',
     packages=find_packages(exclude=["examples", "scripts"]),
     url='https://github.com/jairsan/Speech_Translation_Segmenter',
     license='Apache License 2.0',
