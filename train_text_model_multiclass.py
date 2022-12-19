@@ -13,7 +13,7 @@ import time, os, math
 import numpy as np
 import random
 from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support, classification_report
-
+from transformers import default_data_collator
 
 def save_model(model, args, optimizer, vocabulary, classes_vocabulary, model_str, epoch, train_chunk):
     if not os.path.exists(args.output_folder):
@@ -118,19 +118,19 @@ if __name__ == "__main__":
         pass
     else:
         def text_to_idx(sample):
-            return {"idx": vocabulary.get_index(token) for token in sample["text"]}
+            return {"idx": [vocabulary.get_index(token) for token in sample["words"].split()]}
 
 
-        hf_datasets = hf_datasets.map(text_to_idx)  # remove_columns="text"
+        hf_datasets = hf_datasets.map(text_to_idx).remove_columns(column_names="words")
 
-    train_dataset = hf_datasets.with_format("torch", device=device)
-    dev_dataset = hf_datasets.with_format("torch", device=device)
+    train_dataset = hf_datasets["train"]
+    dev_dataset = hf_datasets["dev"]
 
     train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
-                                       shuffle=True)
+                                       shuffle=True, collate_fn=default_data_collator)
 
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
-                                     shuffle=False, drop_last=False)
+                                     shuffle=False, drop_last=False, collate_fn=default_data_collator)
 
     for epoch in range(1, args.epochs):
 
@@ -149,6 +149,7 @@ if __name__ == "__main__":
 
         for batch in train_dataloader:
             print(batch)
+            exit(0)
 
             if args.transformer_architecture is not None:
                 # Transformer model does this internally
