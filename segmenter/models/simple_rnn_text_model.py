@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 class SimpleRNNTextModel(nn.Module):
+    name: str = "simple-rnn"
 
     def __init__(self,args,dictionary):
         super(SimpleRNNTextModel, self).__init__()

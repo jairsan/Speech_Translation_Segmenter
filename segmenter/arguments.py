@@ -1,13 +1,14 @@
+from segmenter.models import STR_TO_CLASS
+from segmenter.models.rnn_ff_text_model import RNNFFTextModel
+
 def add_train_arguments(parser):
     # Model parameters
     parser.add_argument("--train_corpus", type=str, help="Training text file", required=True)
-    parser.add_argument("--use_train_chunks_from_list", type=str, help="Ignore train_corpus. Data has been chunked into files. This arg points to a file containing the name of 1 chunk per line")
     parser.add_argument("--dev_corpus", type=str, help="Dev text file", required=True)
     parser.add_argument("--output_folder", type=str, help="Save model training here", required=True)
     parser.add_argument("--vocabulary", type=str, help="Vocabulary to be used by the network", required=True)
     parser.add_argument("--vocabulary_max_size", type=int, help="Use up to this number of vocabulary words", default=None)
-    parser.add_argument("--classes_vocabulary", type=str, help="Dictionary of <class> <count> used for multiclass problems")
-    parser.add_argument("--epochs", type=int, help="Train the model this number of epochs",default=40)
+    parser.add_argument("--epochs", type=int, help="Train the model this number of epochs", default=40)
     parser.add_argument("--batch_size", type=int, help="Train batch size", default=256)
     parser.add_argument("--split_weight", type=float, help="Weight given to split samples "
                                                            "(Class 1). No split (Class 0) weight is 1)", default=1)
@@ -27,8 +28,6 @@ def add_train_arguments(parser):
     parser.add_argument("--adam_b1", type=float, default=0.9)
     parser.add_argument("--adam_b2", type=float, default=0.9999)
     parser.add_argument("--adam_eps", type=float, default=1e-08)
-    parser.add_argument("--unk_noise_prob", type=float, default=0.0, help = "Every word in a sample will have probability p to be replaced by \"<unk>\""
-                                                                            "(Noise is applied every time a sample is drawn)" )
     parser.add_argument("--seed", type=int, help="Random seed", default=1)
     parser.add_argument("--train_audio_feas_corpus", type=str, help="Training containing audio feas")
     parser.add_argument("--dev_audio_feas_corpus", type=str, help="Dev containing audio feas")
@@ -47,17 +46,13 @@ def add_model_arguments(parser):
     parser.add_argument("--feedforward_size", type=int, default=128, help="Size of feedforward layers (Only for ff architecture)")
     parser.add_argument("--n_classes", type=int, default=2, help="Number of classification targets")
     parser.add_argument("--dropout", type=float, default=0.3)
-    parser.add_argument("--model_architecture", type=str, choices = ["simple-text", "ff-text", "ff-audio-text",
-                                                                     "ff-audio-text-copy-feas"], default = "ff-text",
-                        )
+    parser.add_argument("--model_architecture", type=str, choices=list(STR_TO_CLASS.keys()), default=RNNFFTextModel.name)
     parser.add_argument("--transformer_architecture", type=str, default=None)
     parser.add_argument("--sample_max_len", type=int, help="Total number of tokens on each sample.")
     parser.add_argument("--sample_window_size", type=int, help="Number of tokens in the future window of each sample. "
                                                                "A sample with max_len=l and window_size=s "
                                                                "has (l - s - 1) previous history tokens. ")
 
-def add_multiclass_infer_arguments(parser):
-    parser.add_argument("--return_type", choices=['casing', 'words'], default="words")
 
 def add_infer_arguments(parser):
     parser.add_argument("--model_path", type=str, help="Load this model", required=True)

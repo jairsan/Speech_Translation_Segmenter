@@ -1,6 +1,6 @@
 import torch
 
-from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
+from segmenter.models.rnn_ff_text_model import RNNFFTextModel
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
 from segmenter.models.rnn_ff_audio_text_model import RNNFFAudioTextModel
 from segmenter.models.rnn_ff_audio_text_feas_copy_model import RNNFFAudioTextFeasCopyModel
@@ -29,7 +29,7 @@ def load_text_model(args):
         else:
             raise Exception
     elif saved_model_args.model_architecture == "ff_text":
-        model = SimpleRNNFFTextModel(saved_model_args, vocabulary)
+        model = RNNFFTextModel(saved_model_args, vocabulary)
     else:
         model = SimpleRNNTextModel(saved_model_args, vocabulary)
 
@@ -60,7 +60,7 @@ def load_text_model_multiclass(args):
         else:
             raise Exception
     elif saved_model_args.model_architecture == "ff_text":
-        model = SimpleRNNFFTextModel(saved_model_args, vocabulary)
+        model = RNNFFTextModel(saved_model_args, vocabulary)
     else:
         model = SimpleRNNTextModel(saved_model_args, vocabulary)
 
@@ -89,7 +89,7 @@ def load_text_and_audio_model(args):
     audio_model.load_state_dict(checkpoint['model_state_dict'])
 
     if text_model_args.model_architecture == "ff_text":
-        text_model = SimpleRNNFFTextModel(text_model_args, vocabulary)
+        text_model = RNNFFTextModel(text_model_args, vocabulary)
     else:
         text_model = SimpleRNNTextModel(text_model_args, vocabulary)
 

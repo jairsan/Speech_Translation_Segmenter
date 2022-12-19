@@ -1,10 +1,10 @@
-from segmenter import text_dataset,text_dataset_multiclass,raw_text_dataset,raw_text_dataset_multiclass,arguments,vocab
+from segmenter import arguments, vocab
+from segmenter.huggingface_dataset import get_text_datasets
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
-from segmenter.models.rnn_ff_text_model import SimpleRNNFFTextModel
+from segmenter.models.rnn_ff_text_model import RNNFFTextModel
 from segmenter.models.bert_text_model import BERTTextModel
 from segmenter.models.xlm_roberta_text_model import XLMRobertaTextModel
 
- 
 import argparse
 import torch
 import torch.utils.data as data
@@ -12,8 +12,7 @@ import torch.optim as optim
 import time, os, math
 import numpy as np
 import random
-import gpustat
-from sklearn.metrics import accuracy_score,f1_score,precision_recall_fscore_support,classification_report
+from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support, classification_report
 
 
 def save_model(model, args, optimizer, vocabulary, classes_vocabulary, model_str, epoch, train_chunk):
@@ -25,10 +24,11 @@ def save_model(model, args, optimizer, vocabulary, classes_vocabulary, model_str
         'optimizer_state_dict': optimizer.state_dict(),
         'vocabulary': vocabulary,
         'classes_vocabulary': classes_vocabulary,
-        'epoch' : epoch,
-        'train_chunk' : train_chunk,
+        'epoch': epoch,
+        'train_chunk': train_chunk,
         'args': args
     }, args.output_folder + "/model." + model_str + ".pt", pickle_protocol=4)
+
 
 def eval_model(args, dev_dataloader, model):
     with torch.no_grad():
@@ -64,6 +64,7 @@ def eval_model(args, dev_dataloader, model):
 
         return f1
 
+
 if __name__ == "__main__":
     start_prep = time.time()
 
@@ -74,40 +75,28 @@ if __name__ == "__main__":
     args = parser.parse_args()
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
-    
-    os.environ['PYTHONHASHSEED']=str(args.seed)
+
+    os.environ['PYTHONHASHSEED'] = str(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    
+
     dataset_workers = 2
 
-    vocabulary = vocab.VocabDictionary()
     if args.transformer_architecture is None:
+        vocabulary = vocab.VocabDictionary()
         vocabulary.create_from_count_file(args.vocabulary, args.vocabulary_max_size)
-    classes_vocabulary = vocab.VocabDictionary(include_special=False)
-    classes_vocabulary.create_from_count_file(args.classes_vocabulary)
+
+    hf_datasets = get_text_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus, temperature=5)
 
     if args.transformer_architecture is not None:
-        dev_dataset = raw_text_dataset_multiclass.SegmentationRawTextDatasetMulticlass(args.dev_corpus, classes_vocabulary)
-    else:
-        dev_dataset = text_dataset_multiclass.SegmentationTextDatasetMulticlass(args.dev_corpus, vocabulary, classes_vocabulary)
-
-    dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size, shuffle=False, drop_last=False,
-                                     collate_fn=dev_dataset.collater)
-
-    if args.transformer_architecture is not None:
-        archetype, _ = args.transformer_architecture.split(":")
-        if archetype == "bert":
-            model = BERTTextModel(args).to(device)
-        elif archetype == "xlm-roberta":
-            model = XLMRobertaTextModel(args).to(device)
-        else:
-            raise Exception
-    elif args.model_architecture == "ff-text":
-        model = SimpleRNNFFTextModel(args, vocabulary).to(device)
-    else:
+        raise Exception
+    elif args.model_architecture == RNNFFTextModel.name:
+        model = RNNFFTextModel(args, vocabulary).to(device)
+    elif args.model_architecture == SimpleRNNTextModel.name:
         model = SimpleRNNTextModel(args, vocabulary).to(device)
+    else:
+        raise Exception
 
     if args.optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.adam_b1, args.adam_b2), eps=args.adam_eps)
@@ -119,21 +108,29 @@ if __name__ == "__main__":
                                                                patience=args.lr_reduce_patience, verbose=True)
     loss = torch.nn.CrossEntropyLoss()
 
-
     end_prep = time.time()
-    print("Model preparation took: ",str(end_prep - start_prep), " seconds.")
+    print("Model preparation took: ", str(end_prep - start_prep), " seconds.")
 
     best_result = -math.inf
     best_epoch = -math.inf
 
-    train_chunks = []
-    if args.use_train_chunks_from_list is not None:
-        with open(args.use_train_chunks_from_list) as filfil:
-            for line in filfil:
-                file_path = line.strip()
-                train_chunks.append(file_path)
+    if args.transformer_architecture is not None:
+        pass
     else:
-        train_chunks.append(args.train_corpus)
+        def text_to_idx(sample):
+            return {"idx": vocabulary.get_index(token) for token in sample["text"]}
+
+
+        hf_datasets = hf_datasets.map(text_to_idx)  # remove_columns="text"
+
+    train_dataset = hf_datasets.with_format("torch", device=device)
+    dev_dataset = hf_datasets.with_format("torch", device=device)
+
+    train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
+                                       shuffle=True)
+
+    dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
+                                     shuffle=False, drop_last=False)
 
     for epoch in range(1, args.epochs):
 
@@ -147,56 +144,44 @@ if __name__ == "__main__":
 
         model.train()
 
-        #Iterate over all chunks
-        for i in range(len(train_chunks)):
+        optimizer.zero_grad()
+        model.train()
 
-            optimizer.zero_grad()
-            model.train()
+        for batch in train_dataloader:
+            print(batch)
 
             if args.transformer_architecture is not None:
-                train_dataset = raw_text_dataset_multiclass.SegmentationRawTextDatasetMulticlass(train_chunks[i], classes_vocabulary, args.sampling_temperature)
+                # Transformer model does this internally
+                y = y.to(device)
             else:
-                train_dataset = text_dataset_multiclass.SegmentationTextDatasetMulticlass(train_chunks[i], vocabulary, classes_vocabulary, args.sampling_temperature)
+                x, y = x.to(device), y.to(device)
 
-            sampler = data.WeightedRandomSampler(train_dataset.weights, len(train_dataset.weights))
+            model_output, lengths, hn = model.forward(x, src_lengths, device)
 
-            train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
-                                       drop_last=True,
-                                       collate_fn=train_dataset.collater, sampler=sampler)
+            results = model.get_sentence_prediction(model_output, lengths, device)
 
-            for x, src_lengths, y in train_dataloader:
-                if args.transformer_architecture is not None:
-                    #Transformer model does this internally
-                    y = y.to(device)
-                else:
-                    x, y = x.to(device), y.to(device)
+            cost = loss(results, y)
 
-                model_output,lengths, hn = model.forward(x, src_lengths, device)
+            cost.backward()
 
-                results = model.get_sentence_prediction(model_output,lengths, device)
+            epoch_cost += cost.detach().cpu().numpy()
+            update += 1
 
-                cost = loss(results, y)
-                
-                cost.backward()
+            if update % args.log_every == 0:
+                curr_time = time.time()
+                diff_t = curr_time - last_time
+                last_time = curr_time
+                print("Epoch ", epoch, " chunk ", i + 1, ", update ", update, ", cost: ",
+                      cost.detach().cpu().numpy(), ", batches per second: ",
+                      str(float(args.log_every) / float(diff_t)), sep="")
+            if update % args.gradient_accumulation == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+        print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
 
-                epoch_cost += cost.detach().cpu().numpy()
-                update+=1
-
-                if update % args.log_every == 0:
-                    curr_time = time.time()
-                    diff_t = curr_time - last_time
-                    last_time = curr_time
-                    print("Epoch ", epoch, " chunk ", i + 1, ", update ", update,", cost: ",
-                          cost.detach().cpu().numpy(), ", batches per second: ",
-                          str( float(args.log_every) / float(diff_t)), sep="")
-                if update % args.gradient_accumulation == 0:
-                    optimizer.step()
-                    optimizer.zero_grad()
-            print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
-
-            if args.checkpoint_every_n_chunks is not None  and (i + 1) % args.checkpoint_every_n_chunks == 0:
-                _ = eval_model(args, dev_dataloader, model)
-                save_model(model, args, optimizer, vocabulary, classes_vocabulary, str(epoch) + "." + str(i),epoch, i)
+        if args.checkpoint_every_n_chunks is not None and (i + 1) % args.checkpoint_every_n_chunks == 0:
+            _ = eval_model(args, dev_dataloader, model)
+            save_model(model, args, optimizer, vocabulary, classes_vocabulary, str(epoch) + "." + str(i), epoch, i)
 
         f1 = eval_model(args, dev_dataloader, model)
 
@@ -209,12 +194,8 @@ if __name__ == "__main__":
 
             save_model(model, args, optimizer, vocabulary, classes_vocabulary, "best", epoch, None)
 
-
-
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
             save_model(model, args, optimizer, vocabulary, classes_vocabulary, str(epoch), epoch, None)
 
-
     print("Training finished.")
-    print("Best checkpoint F1:",best_result, ", achieved at epoch:", best_epoch)
-
+    print("Best checkpoint F1:", best_result, ", achieved at epoch:", best_epoch)

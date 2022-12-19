@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 class RNNFFAudioTextModel(nn.Module):
+    name: str = "rnn-ff-audio"
 
     def __init__(self,args,text_features_size):
         super(RNNFFAudioTextModel, self).__init__()

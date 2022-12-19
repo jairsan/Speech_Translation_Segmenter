@@ -6,5 +6,9 @@ setup(
     url='https://github.com/jairsan/Speech_Translation_Segmenter',
     license='Apache License 2.0',
     author='Javier Iranzo-Sanchez',
-    description='RNN-based streaming segmenter for Speech Translation'
+    description='RNN-based streaming segmenter for Speech Translation',
+    install_requires=[
+        "torch==1.7.0",
+        "scikit-learn==0.21.3",
+        "datasets==2.8.0"]
 )

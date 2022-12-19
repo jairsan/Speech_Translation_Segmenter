@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class SimpleRNNFFTextModel(nn.Module):
+class RNNFFTextModel(nn.Module):
+    name: str = "rnn-ff-text"
+
 
     def __init__(self,args,dictionary):
-        super(SimpleRNNFFTextModel, self).__init__()
+        super(RNNFFTextModel, self).__init__()
         self.args = args
         self.embedding = nn.Embedding(
             num_embeddings=len(dictionary),

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 class RNNFFAudioTextFeasCopyModel(nn.Module):
+    name: str = "rnn-ff-audio-copy"
 
     def __init__(self,args,text_features_size):
         super(RNNFFAudioTextFeasCopyModel, self).__init__()
