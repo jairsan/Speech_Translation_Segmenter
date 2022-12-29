@@ -1,10 +1,14 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
+from segmenter.arguments import add_rnn_arguments
 
 class SimpleRNNTextModel(nn.Module):
     name: str = "simple-rnn"
+
+    @staticmethod
+    def add_model_args(parser):
+        parser = add_rnn_arguments(parser)
+        return parser
 
     def __init__(self,args,dictionary):
         super(SimpleRNNTextModel, self).__init__()

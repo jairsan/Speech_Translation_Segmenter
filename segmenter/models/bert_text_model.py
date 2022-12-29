@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from transformers import BertTokenizer, BertForSequenceClassification
 
+
 class BERTTextModel(nn.Module):
+    name: str = "bert"
 
     def __init__(self,args):
         super(BERTTextModel, self).__init__()

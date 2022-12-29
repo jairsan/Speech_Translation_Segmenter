@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
     arguments.add_infer_arguments(parser)
     arguments.add_multiclass_infer_arguments(parser)
-    arguments.add_model_arguments(parser)
+    arguments.add_general_arguments(parser)
     args = parser.parse_args()
 
     model, vocabulary, classes_vocabulary, _ = utils.load_text_model_multiclass(args)

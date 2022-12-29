@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     arguments.add_infer_arguments(parser)
-    arguments.add_model_arguments(parser)
+    arguments.add_general_arguments(parser)
     args = parser.parse_args()
 
     model, vocabulary, _ = utils.load_text_model(args)

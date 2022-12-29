@@ -224,7 +224,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     arguments.add_infer_arguments(parser)
-    arguments.add_model_arguments(parser)
+    arguments.add_general_arguments(parser)
     args = parser.parse_args()
 
     text_model, vocabulary, text_model_args, audio_model, audio_model_args = utils.load_text_and_audio_model(args)

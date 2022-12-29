@@ -1,11 +1,16 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from segmenter.arguments import add_rnn_arguments, add_ff_arguments
 
 
 class RNNFFTextModel(nn.Module):
     name: str = "rnn-ff-text"
 
+    @staticmethod
+    def add_model_args(parser):
+        parser = add_rnn_arguments(parser)
+        parser = add_ff_arguments(parser)
+        return parser
 
     def __init__(self,args,dictionary):
         super(RNNFFTextModel, self).__init__()

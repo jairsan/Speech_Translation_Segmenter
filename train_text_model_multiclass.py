@@ -15,7 +15,7 @@ import random
 from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support, classification_report
 from transformers import default_data_collator
 
-def save_model(model, args, optimizer, vocabulary, classes_vocabulary, model_str, epoch, train_chunk):
+def save_model(model, args, optimizer, vocabulary, model_str, epoch, train_chunk):
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
     torch.save({
@@ -23,7 +23,6 @@ def save_model(model, args, optimizer, vocabulary, classes_vocabulary, model_str
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'vocabulary': vocabulary,
-        'classes_vocabulary': classes_vocabulary,
         'epoch': epoch,
         'train_chunk': train_chunk,
         'args': args
@@ -37,7 +36,7 @@ def eval_model(args, dev_dataloader, model):
         epoch_cost = 0
         model.eval()
         for x, src_lengths, y in dev_dataloader:
-            if args.transformer_architecture is not None:
+            if args.transformer_model_name is not None:
                 # Transformer model does this internally
                 y = y.to(device)
             else:
@@ -56,8 +55,6 @@ def eval_model(args, dev_dataloader, model):
 
         print("Epoch ", epoch, "chunk ", str(i), ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
         print("Dev Accuracy:", accuracy_score(true_l, predicted_l))
-        true_l = [classes_vocabulary.tokens[idx] for idx in true_l]
-        predicted_l = [classes_vocabulary.tokens[idx] for idx in predicted_l]
         precision, recall, f1, _ = precision_recall_fscore_support(true_l, predicted_l, average='macro')
         print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
         print(classification_report(true_l, predicted_l))
@@ -70,30 +67,39 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     arguments.add_train_arguments(parser)
-    arguments.add_model_arguments(parser)
+    arguments.add_general_arguments(parser)
 
-    args = parser.parse_args()
+    known_args, unknown_args = parser.parse_known_args()
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
 
-    os.environ['PYTHONHASHSEED'] = str(args.seed)
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    os.environ['PYTHONHASHSEED'] = str(known_args.seed)
+    random.seed(known_args.seed)
+    np.random.seed(known_args.seed)
+    torch.manual_seed(known_args.seed)
 
     dataset_workers = 2
 
-    if args.transformer_architecture is None:
+    if known_args.transformer_model_name is None:
         vocabulary = vocab.VocabDictionary()
-        vocabulary.create_from_count_file(args.vocabulary, args.vocabulary_max_size)
+        vocabulary.create_from_count_file(known_args.vocabulary, known_args.vocabulary_max_size)
 
-    hf_datasets = get_text_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus, temperature=5)
+    hf_datasets = get_text_datasets(train_text_file=known_args.train_corpus, dev_text_file=known_args.dev_corpus,
+                                    temperature=known_args.sampling_temperature)
 
-    if args.transformer_architecture is not None:
+    if known_args.model_architecture != BERTTextModel and known_args.model_architecture != XLMRobertaTextModel and known_args.transformer_model_name is not None:
+        # Cant use transformer model name if we are not using transformer
         raise Exception
-    elif args.model_architecture == RNNFFTextModel.name:
+
+    if known_args.model_architecture == RNNFFTextModel.name:
+        RNNFFTextModel.add_model_args(parser)
+        model_specific_args = parser.parse_args(unknown_args)
+        args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
         model = RNNFFTextModel(args, vocabulary).to(device)
-    elif args.model_architecture == SimpleRNNTextModel.name:
+    elif known_args.model_architecture == SimpleRNNTextModel.name:
+        SimpleRNNTextModel.add_model_args(parser)
+        model_specific_args = parser.parse_args(unknown_args)
+        args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
         model = SimpleRNNTextModel(args, vocabulary).to(device)
     else:
         raise Exception
@@ -114,7 +120,7 @@ if __name__ == "__main__":
     best_result = -math.inf
     best_epoch = -math.inf
 
-    if args.transformer_architecture is not None:
+    if args.transformer_model_name is not None:
         pass
     else:
         def text_to_idx(sample):
@@ -147,11 +153,9 @@ if __name__ == "__main__":
         optimizer.zero_grad()
         model.train()
 
-        for batch in train_dataloader:
-            print(batch)
-            exit(0)
+        for i, batch in enumerate(train_dataloader):
 
-            if args.transformer_architecture is not None:
+            if args.transformer_model_name is not None:
                 # Transformer model does this internally
                 y = y.to(device)
             else:
@@ -182,7 +186,7 @@ if __name__ == "__main__":
 
         if args.checkpoint_every_n_chunks is not None and (i + 1) % args.checkpoint_every_n_chunks == 0:
             _ = eval_model(args, dev_dataloader, model)
-            save_model(model, args, optimizer, vocabulary, classes_vocabulary, str(epoch) + "." + str(i), epoch, i)
+            save_model(model, args, optimizer, vocabulary, str(epoch) + "." + str(i), epoch, i)
 
         f1 = eval_model(args, dev_dataloader, model)
 
@@ -193,10 +197,10 @@ if __name__ == "__main__":
             best_result = f1
             best_epoch = epoch
 
-            save_model(model, args, optimizer, vocabulary, classes_vocabulary, "best", epoch, None)
+            save_model(model, args, optimizer, vocabulary, "best", epoch, None)
 
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
-            save_model(model, args, optimizer, vocabulary, classes_vocabulary, str(epoch), epoch, None)
+            save_model(model, args, optimizer, vocabulary, str(epoch), epoch, None)
 
     print("Training finished.")
     print("Best checkpoint F1:", best_result, ", achieved at epoch:", best_epoch)
