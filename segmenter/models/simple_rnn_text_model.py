@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from segmenter.arguments import add_rnn_arguments
+from segmenter.model_arguments import add_rnn_arguments
+
 
 class SimpleRNNTextModel(nn.Module):
     name: str = "simple-rnn"
@@ -31,37 +32,37 @@ class SimpleRNNTextModel(nn.Module):
 
         self.linear1 = nn.Linear(args.rnn_layer_size, args.n_classes, bias=True)
 
-    def forward(self, x, src_lengths, device=None, h0=None):
-
-        x, lengths, hn = self.extract_features(x, src_lengths, h0)
+    def forward(self, batch, device):
+        x, lengths, hn = self.extract_features(batch, device)
         x = self.linear1(x)
-        return x, lengths, hn
+        return x
 
-    def extract_features(self, x, src_lengths, h0=None):
+    def extract_features(self, batch, device):
         """
         Extract the features computed by the model (ignoring the output layer)
 
         """
+        x = batch["idx"]
+        x = x.to(device)
         x = self.embedding(x)
         x = self.embedding_dropout(x)
-        x = nn.utils.rnn.pack_padded_sequence(x, src_lengths, batch_first=True, enforce_sorted=False)
-        x, hn = self.rnn(x,h0)
-        x, lengths = nn.utils.rnn.pad_packed_sequence(x, batch_first=True, padding_value=0.0)
+        x = nn.utils.rnn.pack_sequence(x, enforce_sorted=False)
+        x, _ = self.rnn(x)
+        x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True, padding_value=0.0)
         x = self.post_rnn_dropout(x)
 
-        return x, lengths, hn
+        return x
 
-    def get_sentence_prediction(self,model_output,lengths, device):
+    def get_sentence_prediction(self, model_output):
         """
         Returns the model output (which depends on the length),
         for each sample in the batch.
         """
-        select = lengths - torch.ones(lengths.shape, dtype=torch.long)
-        
-        select = select.to(device)
 
-        indices = torch.unsqueeze(select, 1)
-        indices = torch.unsqueeze(indices, 2).repeat(1, 1, self.args.n_classes)
-        results = torch.gather(model_output, 1, indices).squeeze(1)
+        results = model_output[:, -1, :]
 
+        print(f"input: {model_output}")
+        print(f"output: {results}")
+
+        exit(0)
         return results

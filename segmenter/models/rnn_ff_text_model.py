@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from segmenter.arguments import add_rnn_arguments, add_ff_arguments
+from segmenter.model_arguments import add_ff_arguments, add_rnn_arguments
 
 
 class RNNFFTextModel(nn.Module):

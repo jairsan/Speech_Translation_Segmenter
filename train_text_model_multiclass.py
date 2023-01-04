@@ -70,6 +70,9 @@ if __name__ == "__main__":
     arguments.add_general_arguments(parser)
 
     known_args, unknown_args = parser.parse_known_args()
+
+    model_arguments_parser = argparse.ArgumentParser()
+
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
 
@@ -92,14 +95,16 @@ if __name__ == "__main__":
         raise Exception
 
     if known_args.model_architecture == RNNFFTextModel.name:
-        RNNFFTextModel.add_model_args(parser)
-        model_specific_args = parser.parse_args(unknown_args)
+        RNNFFTextModel.add_model_args(model_arguments_parser)
+        model_specific_args = model_arguments_parser.parse_args(unknown_args)
         args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
+        print(f" args {args}")
         model = RNNFFTextModel(args, vocabulary).to(device)
     elif known_args.model_architecture == SimpleRNNTextModel.name:
-        SimpleRNNTextModel.add_model_args(parser)
-        model_specific_args = parser.parse_args(unknown_args)
+        SimpleRNNTextModel.add_model_args(model_arguments_parser)
+        model_specific_args = model_arguments_parser.parse_args(unknown_args)
         args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
+        print(f" args2 {args}")
         model = SimpleRNNTextModel(args, vocabulary).to(device)
     else:
         raise Exception
@@ -155,17 +160,11 @@ if __name__ == "__main__":
 
         for i, batch in enumerate(train_dataloader):
 
-            if args.transformer_model_name is not None:
-                # Transformer model does this internally
-                y = y.to(device)
-            else:
-                x, y = x.to(device), y.to(device)
+            model_output = model.forward(batch, device)
 
-            model_output, lengths, hn = model.forward(x, src_lengths, device)
+            results = model.get_sentence_prediction(model_output)
 
-            results = model.get_sentence_prediction(model_output, lengths, device)
-
-            cost = loss(results, y)
+            cost = loss(results, batch["labels"])
 
             cost.backward()
 
