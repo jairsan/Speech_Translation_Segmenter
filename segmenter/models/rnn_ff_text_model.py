@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 from segmenter.model_arguments import add_ff_arguments, add_rnn_arguments
+from segmenter.models.segmenter_model import SegmenterModel
 
 
-class RNNFFTextModel(nn.Module):
+class RNNFFTextModel(SegmenterModel):
     name: str = "rnn-ff-text"
 
     @staticmethod
     def add_model_args(parser):
-        parser = add_rnn_arguments(parser)
-        parser = add_ff_arguments(parser)
-        return parser
+        add_rnn_arguments(parser)
+        add_ff_arguments(parser)
 
-    def __init__(self,args,dictionary):
+    def __init__(self, args, dictionary):
         super(RNNFFTextModel, self).__init__()
         self.args = args
         self.embedding = nn.Embedding(
@@ -31,10 +31,9 @@ class RNNFFTextModel(nn.Module):
 
         self.post_rnn_dropout = torch.nn.Dropout(p=args.dropout)
 
-
         l = [nn.Linear(args.rnn_layer_size * (args.sample_window_size + 1), args.feedforward_size, bias=True), nn.ReLU(), nn.Dropout(p=args.dropout)]
 
-        for i in range(1,self.args.feedforward_layers):
+        for i in range(1, self.args.feedforward_layers):
             l.append(nn.Linear(args.feedforward_size, args.feedforward_size, bias=True))
             l.append(nn.ReLU())
             l.append(nn.Dropout(p=args.dropout))
@@ -43,8 +42,8 @@ class RNNFFTextModel(nn.Module):
 
         self.output = nn.Linear(args.feedforward_size, args.n_classes, bias=True)
 
-    def forward(self, x, src_lengths, h0=None):
-        x, lengths, hn = self.extract_features(x, src_lengths, h0)
+    def forward(self, x, device: torch.device):
+        x = self.extract_features(x, device)
 
         x_sel = x[:, -(self.window_size+1):, :]
 
@@ -55,33 +54,18 @@ class RNNFFTextModel(nn.Module):
 
         x = self.output(x_ff)
 
-        return x, lengths, hn
+        return x
 
-    def extract_features(self, x, src_lengths, h0=None):
-        """
-        Extract the features computed by the model (ignoring the output layer)
-
-        """
+    def extract_features(self, x: torch.Tensor, device: torch.device):
         x = self.embedding(x)
         x = self.embedding_dropout(x)
-        x = nn.utils.rnn.pack_padded_sequence(x, src_lengths, batch_first=True, enforce_sorted=False)
-        x, hn = self.rnn(x,h0)
+        x = nn.utils.rnn.pack_sequence(x, enforce_sorted=False)
+        x, hn = self.rnn(x)
         x, lengths = nn.utils.rnn.pad_packed_sequence(x, batch_first=True, padding_value=0.0)
         x = self.post_rnn_dropout(x)
 
-        return x, lengths, hn
+        return x
 
-    def get_sentence_prediction(self,model_output,lengths, device):
-        """
-        Returns the model output (which depends on the length),
-        for each sample in the batch.
+    def get_sentence_prediction(self, model_output: torch.Tensor) -> torch.Tensor:
 
-        select = lengths - torch.ones(lengths.shape, dtype=torch.long)
-
-        select = select.to(device)
-
-        indices = torch.unsqueeze(select, 1)
-        indices = torch.unsqueeze(indices, 2).repeat(1, 1, 2)
-        results = torch.gather(model_output, 1, indices).squeeze(1)
-        """
         return model_output

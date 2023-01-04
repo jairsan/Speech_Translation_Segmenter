@@ -9,13 +9,15 @@ import argparse
 import torch
 import torch.utils.data as data
 import torch.optim as optim
-import time, os, math
+import time
+import os
+import math
 import numpy as np
 import random
-from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support, classification_report
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
 from transformers import default_data_collator
 
-def save_model(model, args, optimizer, vocabulary, model_str, epoch, train_chunk):
+def save_model(model, args, optimizer, vocabulary, model_str):
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
     torch.save({
@@ -23,28 +25,21 @@ def save_model(model, args, optimizer, vocabulary, model_str, epoch, train_chunk
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'vocabulary': vocabulary,
-        'epoch': epoch,
-        'train_chunk': train_chunk,
         'args': args
     }, args.output_folder + "/model." + model_str + ".pt", pickle_protocol=4)
 
 
-def eval_model(args, dev_dataloader, model):
+def eval_model(dev_dataloader, model, epoch, update):
     with torch.no_grad():
         predicted_l = []
         true_l = []
         epoch_cost = 0
         model.eval()
-        for x, src_lengths, y in dev_dataloader:
-            if args.transformer_model_name is not None:
-                # Transformer model does this internally
-                y = y.to(device)
-            else:
-                x, y = x.to(device), y.to(device)
+        for batch in dev_dataloader:
+            y = batch["labels"].to(device)
+            model_output = model.forward(batch, device)
 
-            model_output, lengths, hn = model.forward(x, src_lengths, device)
-
-            results = model.get_sentence_prediction(model_output, lengths, device)
+            results = model.get_sentence_prediction(model_output)
             yhat = torch.argmax(results, dim=1)
 
             predicted_l.extend(yhat.detach().cpu().numpy().tolist())
@@ -53,7 +48,7 @@ def eval_model(args, dev_dataloader, model):
             cost = loss(results, y)
             epoch_cost += cost.detach().cpu().numpy()
 
-        print("Epoch ", epoch, "chunk ", str(i), ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
+        print("Epoch ", epoch, "update ", update, ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
         print("Dev Accuracy:", accuracy_score(true_l, predicted_l))
         precision, recall, f1, _ = precision_recall_fscore_support(true_l, predicted_l, average='macro')
         print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
@@ -143,6 +138,7 @@ if __name__ == "__main__":
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
                                      shuffle=False, drop_last=False, collate_fn=default_data_collator)
 
+    update = 0
     for epoch in range(1, args.epochs):
 
         last_time = time.time()
@@ -151,20 +147,18 @@ if __name__ == "__main__":
 
         epoch_cost = 0
 
-        update = 0
-
         model.train()
 
         optimizer.zero_grad()
         model.train()
 
-        for i, batch in enumerate(train_dataloader):
+        for batch in train_dataloader:
 
             model_output = model.forward(batch, device)
 
             results = model.get_sentence_prediction(model_output)
 
-            cost = loss(results, batch["labels"])
+            cost = loss(results, batch["labels"].to(device))
 
             cost.backward()
 
@@ -175,19 +169,20 @@ if __name__ == "__main__":
                 curr_time = time.time()
                 diff_t = curr_time - last_time
                 last_time = curr_time
-                print("Epoch ", epoch, " chunk ", i + 1, ", update ", update, ", cost: ",
+                print("Epoch ", epoch, ", update ", update, ", cost: ",
                       cost.detach().cpu().numpy(), ", batches per second: ",
                       str(float(args.log_every) / float(diff_t)), sep="")
             if update % args.gradient_accumulation == 0:
                 optimizer.step()
                 optimizer.zero_grad()
+
+            if args.checkpoint_every_n_updates is not None and (update + 1) % args.checkpoint_every_n_updates == 0:
+                _ = eval_model(dev_dataloader, model, epoch, update)
+                save_model(model, args, optimizer, vocabulary, str(epoch) + "." + str(update))
+
         print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
 
-        if args.checkpoint_every_n_chunks is not None and (i + 1) % args.checkpoint_every_n_chunks == 0:
-            _ = eval_model(args, dev_dataloader, model)
-            save_model(model, args, optimizer, vocabulary, str(epoch) + "." + str(i), epoch, i)
-
-        f1 = eval_model(args, dev_dataloader, model)
+        f1 = eval_model(dev_dataloader, model, epoch, update)
 
         if args.lr_schedule == "reduce_on_plateau":
             scheduler.step(f1)
@@ -196,10 +191,10 @@ if __name__ == "__main__":
             best_result = f1
             best_epoch = epoch
 
-            save_model(model, args, optimizer, vocabulary, "best", epoch, None)
+            save_model(model, args, optimizer, vocabulary, "best")
 
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
-            save_model(model, args, optimizer, vocabulary, str(epoch), epoch, None)
+            save_model(model, args, optimizer, vocabulary, str(epoch))
 
     print("Training finished.")
     print("Best checkpoint F1:", best_result, ", achieved at epoch:", best_epoch)
