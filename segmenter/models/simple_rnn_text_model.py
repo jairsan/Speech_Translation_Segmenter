@@ -2,10 +2,10 @@ from typing import Dict
 import torch
 import torch.nn as nn
 from segmenter.model_arguments import add_rnn_arguments
-from segmenter.models.segmenter_model import SegmenterModel
+from segmenter.models.segmenter_model import SegmenterTextModel
 
 
-class SimpleRNNTextModel(SegmenterModel):
+class SimpleRNNTextModel(SegmenterTextModel):
     name: str = "simple-rnn"
 
     @staticmethod

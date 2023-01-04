@@ -1,10 +1,11 @@
+from typing import Dict
 import torch
 import torch.nn as nn
 from segmenter.model_arguments import add_ff_arguments, add_rnn_arguments
-from segmenter.models.segmenter_model import SegmenterModel
+from segmenter.models.segmenter_model import SegmenterTextModel
 
 
-class RNNFFTextModel(SegmenterModel):
+class RNNFFTextModel(SegmenterTextModel):
     name: str = "rnn-ff-text"
 
     @staticmethod
@@ -42,8 +43,8 @@ class RNNFFTextModel(SegmenterModel):
 
         self.output = nn.Linear(args.feedforward_size, args.n_classes, bias=True)
 
-    def forward(self, x, device: torch.device):
-        x = self.extract_features(x, device)
+    def forward(self, batch: Dict, device: torch.device):
+        x = self.extract_features(batch, device)
 
         x_sel = x[:, -(self.window_size+1):, :]
 
@@ -56,7 +57,9 @@ class RNNFFTextModel(SegmenterModel):
 
         return x
 
-    def extract_features(self, x: torch.Tensor, device: torch.device):
+    def extract_features(self, batch: Dict, device: torch.device):
+        x = batch["idx"]
+        x = x.to(device)
         x = self.embedding(x)
         x = self.embedding_dropout(x)
         x = nn.utils.rnn.pack_sequence(x, enforce_sorted=False)

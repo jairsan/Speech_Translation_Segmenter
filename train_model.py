@@ -1,5 +1,5 @@
 from segmenter import arguments, vocab
-from segmenter.huggingface_dataset import get_text_datasets
+from segmenter.huggingface_dataset import get_datasets
 from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
 from segmenter.models.rnn_ff_text_model import RNNFFTextModel
 from segmenter.models.bert_text_model import BERTTextModel
@@ -82,8 +82,6 @@ if __name__ == "__main__":
         vocabulary = vocab.VocabDictionary()
         vocabulary.create_from_count_file(known_args.vocabulary, known_args.vocabulary_max_size)
 
-    hf_datasets = get_text_datasets(train_text_file=known_args.train_corpus, dev_text_file=known_args.dev_corpus,
-                                    temperature=known_args.sampling_temperature)
 
     if known_args.model_architecture != BERTTextModel and known_args.model_architecture != XLMRobertaTextModel and known_args.transformer_model_name is not None:
         # Cant use transformer model name if we are not using transformer
@@ -119,6 +117,11 @@ if __name__ == "__main__":
 
     best_result = -math.inf
     best_epoch = -math.inf
+
+    hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
+                               temperature=args.sampling_temperature,
+                               train_audio_features_file=args.train_audio_features_corpus,
+                               dev_audio_features_file=args.dev_audio_features_corpus)
 
     if args.transformer_model_name is not None:
         pass

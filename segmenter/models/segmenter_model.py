@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 
-class SegmenterModel(nn.Module):
+class SegmenterTextModel(nn.Module):
     def forward(self, batch: Dict, device: torch.device) -> torch.Tensor:
         raise NotImplementedError
 

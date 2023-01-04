@@ -1,12 +1,18 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
+from segmenter.models.segmenter_model import SegmenterTextModel
 
 
 class RNNFFAudioTextFeasCopyModel(nn.Module):
     name: str = "rnn-ff-audio-copy"
 
-    def __init__(self,args,text_features_size):
+    @staticmethod
+    def add_model_args(parser):
+        add_rnn_arguments(parser)
+        add_ff_arguments(parser)
+
+    def __init__(self, args, text_features_size):
         super(RNNFFAudioTextFeasCopyModel, self).__init__()
 
         self.args = args
@@ -31,7 +37,7 @@ class RNNFFAudioTextFeasCopyModel(nn.Module):
         x_feas, lengths = nn.utils.rnn.pad_packed_sequence(x_feas, batch_first=True, padding_value=0.0)
 
         # Concatenate on the last dimension
-        x_comb = torch.cat((x_feas,text_feas),dim=2)
+        x_comb = torch.cat((x_feas, text_feas), dim=2)
 
         # Keep only the ones we want
         x_comb_s = x_comb[:, -(self.window_size+1):, :]
@@ -46,17 +52,6 @@ class RNNFFAudioTextFeasCopyModel(nn.Module):
 
         return x_ff, lengths, None
 
-    def get_sentence_prediction(self,model_output,lengths, device):
-        """
-        Returns the model output (which depends on the length),
-        for each sample in the batch.
+    def get_sentence_prediction(self, model_output: torch.Tensor) -> torch.Tensor:
 
-        select = lengths - torch.ones(lengths.shape, dtype=torch.long)
-
-        select = select.to(device)
-
-        indices = torch.unsqueeze(select, 1)
-        indices = torch.unsqueeze(indices, 2).repeat(1, 1, 2)
-        results = torch.gather(model_output, 1, indices).squeeze(1)
-        """
         return model_output
