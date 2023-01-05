@@ -1,28 +1,31 @@
+from typing import Dict
+
 import torch
 import torch.nn as nn
 
-from segmenter.models.segmenter_model import SegmenterTextModel
-
+from segmenter.model_arguments import add_audio_train_arguments, add_ff_arguments, add_common_arguments
 
 class RNNFFAudioTextFeasCopyModel(nn.Module):
     name: str = "rnn-ff-audio-copy"
 
     @staticmethod
     def add_model_args(parser):
-        add_rnn_arguments(parser)
+        add_audio_train_arguments(parser)
         add_ff_arguments(parser)
+        add_common_arguments(parser)
+        parser.add_argument("--audio_features_size", type=int, default=3, help="Size of the audio features")
 
-    def __init__(self, args, text_features_size):
+    def __init__(self, args, text_model, text_features_size):
         super(RNNFFAudioTextFeasCopyModel, self).__init__()
 
         self.args = args
 
         self.window_size = args.sample_window_size
 
-        l = [nn.Linear( (args.embedding_size + text_features_size) * (args.sample_window_size + 1), args.feedforward_size, bias=True),
+        l = [nn.Linear( (args.audio_features_size + text_features_size) * (args.sample_window_size + 1), args.feedforward_size, bias=True),
              nn.ReLU(), nn.Dropout(p=args.dropout)]
 
-        for i in range(1,self.args.feedforward_layers):
+        for i in range(1, self.args.feedforward_layers):
             l.append(nn.Linear(args.feedforward_size, args.feedforward_size, bias=True))
             l.append(nn.ReLU())
             l.append(nn.Dropout(p=args.dropout))
@@ -31,10 +34,14 @@ class RNNFFAudioTextFeasCopyModel(nn.Module):
 
         self.output = nn.Linear(args.feedforward_size, args.n_classes, bias=True)
 
-    def forward(self, x_feas, text_feas, src_lengths, h0=None):
+        self.text_model = text_model
 
-        x_feas = nn.utils.rnn.pack_padded_sequence(x_feas, src_lengths, batch_first=True, enforce_sorted=False)
-        x_feas, lengths = nn.utils.rnn.pad_packed_sequence(x_feas, batch_first=True, padding_value=0.0)
+    def forward(self, batch: Dict, device: torch.device):
+
+        with torch.no_grad():
+            text_feas = self.text_model.extract_features(batch, device)
+
+        x_feas = batch["audio_features"].to(device)
 
         # Concatenate on the last dimension
         x_comb = torch.cat((x_feas, text_feas), dim=2)
@@ -50,7 +57,7 @@ class RNNFFAudioTextFeasCopyModel(nn.Module):
 
         x_ff = self.output(x_ff)
 
-        return x_ff, lengths, None
+        return x_ff
 
     def get_sentence_prediction(self, model_output: torch.Tensor) -> torch.Tensor:
 

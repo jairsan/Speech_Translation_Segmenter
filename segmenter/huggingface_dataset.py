@@ -1,14 +1,14 @@
-from typing import List
+from typing import List, Dict
 from datasets import Dataset, load_dataset, ClassLabel, interleave_datasets, concatenate_datasets
 
 
-def features_to_np(sample) -> List[List[float]]:
+def features_to_np(sample) -> Dict[str, List[List[float]]]:
     feas: List[str] = sample["text"].split(";")
-    return [list(map(float, fea.split())) for fea in feas]
+    return {"audio_features": [list(map(float, fea.split())) for fea in feas]}
 
 
 def get_datasets(train_text_file: str, dev_text_file: str, temperature: int,
-                 train_audio_features_file: str, dev_audio_features_file: str) -> Dataset:
+                 train_audio_features_file: str = None, dev_audio_features_file: str = None) -> Dataset:
     hf_dataset = load_dataset("text", data_files={"train": train_text_file, "dev": dev_text_file})
     hf_dataset = hf_dataset.map(lambda sample: {"words": " ".join(sample["text"].split()[1:])})
     hf_dataset = hf_dataset.map(lambda sample: {"label": int(sample["text"].split()[0])}, remove_columns="text")
@@ -29,7 +29,11 @@ def get_datasets(train_text_file: str, dev_text_file: str, temperature: int,
 
             audio_dataset = audio_dataset.map(features_to_np, remove_columns="text")
 
-            hf_dataset = concatenate_datasets([hf_dataset, audio_dataset], axis=1)
+            #print(len(hf_dataset["train"]), len(audio_dataset["train"]))
+
+            hf_dataset["train"] = concatenate_datasets([hf_dataset["train"], audio_dataset["train"]], axis=1)
+            hf_dataset["dev"] = concatenate_datasets([hf_dataset["dev"], audio_dataset["dev"]], axis=1)
+
 
     per_class_train_datasets = [hf_dataset["train"].filter(lambda sample: sample["label"] == i) for i in range(len(train_uniq_labels))]
 

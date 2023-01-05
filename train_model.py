@@ -1,7 +1,7 @@
-from segmenter import arguments, vocab
+from segmenter import arguments, vocab, utils
 from segmenter.huggingface_dataset import get_datasets
-from segmenter.models.simple_rnn_text_model import SimpleRNNTextModel
-from segmenter.models.rnn_ff_text_model import RNNFFTextModel
+from segmenter.utils import load_text_model
+from segmenter.models.segmenter_model import FeatureExtractorSegmenterModel
 from segmenter.models.bert_text_model import BERTTextModel
 from segmenter.models.xlm_roberta_text_model import XLMRobertaTextModel
 
@@ -17,13 +17,11 @@ import random
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
 from transformers import default_data_collator
 
-def save_model(model, args, optimizer, vocabulary, model_str):
+def save_model(model, args, vocabulary, model_str):
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
     torch.save({
-        'version': "0.4",
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
         'vocabulary': vocabulary,
         'args': args
     }, args.output_folder + "/model." + model_str + ".pt", pickle_protocol=4)
@@ -81,26 +79,32 @@ if __name__ == "__main__":
     if known_args.transformer_model_name is None:
         vocabulary = vocab.VocabDictionary()
         vocabulary.create_from_count_file(known_args.vocabulary, known_args.vocabulary_max_size)
-
+    else:
+        vocabulary = None
 
     if known_args.model_architecture != BERTTextModel and known_args.model_architecture != XLMRobertaTextModel and known_args.transformer_model_name is not None:
         # Cant use transformer model name if we are not using transformer
         raise Exception
 
-    if known_args.model_architecture == RNNFFTextModel.name:
-        RNNFFTextModel.add_model_args(model_arguments_parser)
-        model_specific_args = model_arguments_parser.parse_args(unknown_args)
-        args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
-        print(f" args {args}")
-        model = RNNFFTextModel(args, vocabulary).to(device)
-    elif known_args.model_architecture == SimpleRNNTextModel.name:
-        SimpleRNNTextModel.add_model_args(model_arguments_parser)
-        model_specific_args = model_arguments_parser.parse_args(unknown_args)
-        args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
-        print(f" args2 {args}")
-        model = SimpleRNNTextModel(args, vocabulary).to(device)
+    model_class, requires_vocab = utils.model_picker(known_args)
+    model_class.add_model_args(model_arguments_parser)
+    model_specific_args = model_arguments_parser.parse_args(unknown_args)
+    args = argparse.Namespace(**vars(known_args), **vars(model_specific_args))
+
+    if hasattr(args, "frozen_text_model_path"):
+        text_model, text_vocab, saved_model_args = load_text_model(args.frozen_text_model_path)
+        text_model = text_model.to(device)
+        assert isinstance(text_model, FeatureExtractorSegmenterModel)
+
+        model = model_class(args, text_model, saved_model_args.rnn_layer_size).to(device)
+
+        # overwrite the vocabulary so that it uses the one from the stored model
+        vocabulary = text_vocab
     else:
-        raise Exception
+        if requires_vocab:
+            model = model_class(args, vocabulary).to(device)
+        else:
+            model = model_class(args).to(device)
 
     if args.optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.adam_b1, args.adam_b2), eps=args.adam_eps)
@@ -118,11 +122,14 @@ if __name__ == "__main__":
     best_result = -math.inf
     best_epoch = -math.inf
 
-    hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
-                               temperature=args.sampling_temperature,
-                               train_audio_features_file=args.train_audio_features_corpus,
-                               dev_audio_features_file=args.dev_audio_features_corpus)
-
+    if hasattr(args, "train_audio_features_corpus") and hasattr(args, "dev_audio_features_corpus"):
+        hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
+                                   temperature=args.sampling_temperature,
+                                   train_audio_features_file=args.train_audio_features_corpus,
+                                   dev_audio_features_file=args.dev_audio_features_corpus)
+    else:
+        hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
+                                   temperature=args.sampling_temperature)
     if args.transformer_model_name is not None:
         pass
     else:
@@ -146,11 +153,7 @@ if __name__ == "__main__":
 
         last_time = time.time()
 
-        optimizer.zero_grad()
-
         epoch_cost = 0
-
-        model.train()
 
         optimizer.zero_grad()
         model.train()
@@ -181,7 +184,7 @@ if __name__ == "__main__":
 
             if args.checkpoint_every_n_updates is not None and (update + 1) % args.checkpoint_every_n_updates == 0:
                 _ = eval_model(dev_dataloader, model, epoch, update)
-                save_model(model, args, optimizer, vocabulary, str(epoch) + "." + str(update))
+                save_model(model, args, vocabulary, str(epoch) + "." + str(update))
 
         print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
 
@@ -194,10 +197,10 @@ if __name__ == "__main__":
             best_result = f1
             best_epoch = epoch
 
-            save_model(model, args, optimizer, vocabulary, "best")
+            save_model(model, args, vocabulary, "best")
 
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
-            save_model(model, args, optimizer, vocabulary, str(epoch))
+            save_model(model, args, vocabulary, str(epoch))
 
     print("Training finished.")
     print("Best checkpoint F1:", best_result, ", achieved at epoch:", best_epoch)

@@ -1,17 +1,18 @@
 from typing import Dict
 import torch
 import torch.nn as nn
-from segmenter.model_arguments import add_ff_arguments, add_rnn_arguments
-from segmenter.models.segmenter_model import SegmenterTextModel
+from segmenter.model_arguments import add_ff_arguments, add_rnn_arguments, add_common_arguments
+from segmenter.models.segmenter_model import FeatureExtractorSegmenterModel
 
 
-class RNNFFTextModel(SegmenterTextModel):
+class RNNFFTextModel(FeatureExtractorSegmenterModel):
     name: str = "rnn-ff-text"
 
     @staticmethod
     def add_model_args(parser):
         add_rnn_arguments(parser)
         add_ff_arguments(parser)
+        add_common_arguments(parser)
 
     def __init__(self, args, dictionary):
         super(RNNFFTextModel, self).__init__()
@@ -28,7 +29,7 @@ class RNNFFTextModel(SegmenterTextModel):
 
         # We put dropout in case we add multiple layers in the future
         self.rnn = nn.GRU(batch_first=True, input_size=args.embedding_size,
-                          hidden_size=args.rnn_layer_size,dropout=args.dropout)
+                          hidden_size=args.rnn_layer_size, dropout=args.dropout)
 
         self.post_rnn_dropout = torch.nn.Dropout(p=args.dropout)
 

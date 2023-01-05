@@ -1,16 +1,17 @@
 from typing import Dict
 import torch
 import torch.nn as nn
-from segmenter.model_arguments import add_rnn_arguments
-from segmenter.models.segmenter_model import SegmenterTextModel
+from segmenter.model_arguments import add_rnn_arguments, add_common_arguments
+from segmenter.models.segmenter_model import FeatureExtractorSegmenterModel
 
 
-class SimpleRNNTextModel(SegmenterTextModel):
+class SimpleRNNTextModel(FeatureExtractorSegmenterModel):
     name: str = "simple-rnn"
 
     @staticmethod
     def add_model_args(parser):
         add_rnn_arguments(parser)
+        add_common_arguments(parser)
 
     def __init__(self, args, dictionary):
         super(SimpleRNNTextModel, self).__init__()

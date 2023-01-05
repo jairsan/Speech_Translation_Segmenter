@@ -6,7 +6,7 @@ from transformers import XLMRobertaTokenizer, XLMRobertaForSequenceClassificatio
 class XLMRobertaTextModel(nn.Module):
     name: str = "xlm-roberta"
 
-    def __init__(self,args):
+    def __init__(self, args):
         super(XLMRobertaTextModel, self).__init__()
         self.transformer_model = XLMRobertaForSequenceClassification.from_pretrained(args.transformer_architecture.split(":")[1], return_dict=True, num_labels=args.n_classes)
         self.tokenizer = XLMRobertaTokenizer.from_pretrained(args.transformer_architecture.split(":")[1])

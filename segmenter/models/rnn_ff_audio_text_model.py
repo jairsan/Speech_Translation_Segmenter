@@ -1,12 +1,19 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from segmenter.model_arguments import add_audio_train_arguments, add_common_arguments
 
 
 class RNNFFAudioTextModel(nn.Module):
     name: str = "rnn-ff-audio"
 
-    def __init__(self,args,text_features_size):
+    @staticmethod
+    def add_model_args(parser):
+        add_audio_train_arguments(parser)
+        add_common_arguments(parser)
+        parser.add_argument("--audio_rnn_layer_size", type=int, default=8,
+                            help="Hidden size of the RNN layers for the audio encoder")
+
+    def __init__(self, args, text_model, text_features_size):
         super(RNNFFAudioTextModel, self).__init__()
 
         self.args = args
@@ -14,7 +21,7 @@ class RNNFFAudioTextModel(nn.Module):
         self.window_size = args.sample_window_size
 
         # We put dropout in case we add multiple layers in the future
-        self.rnn = nn.GRU(batch_first=True, input_size=args.embedding_size,
+        self.rnn = nn.GRU(batch_first=True, input_size=args.audio_features_size,
                           hidden_size=args.audio_rnn_layer_size,dropout=args.dropout)
 
         self.post_rnn_dropout = torch.nn.Dropout(p=args.dropout)
@@ -31,11 +38,16 @@ class RNNFFAudioTextModel(nn.Module):
 
         self.output = nn.Linear(args.feedforward_size, args.n_classes, bias=True)
 
-    def forward(self, x_feas, text_feas, src_lengths, h0=None):
+        self.text_model = text_model
 
-        x_feas = nn.utils.rnn.pack_padded_sequence(x_feas, src_lengths, batch_first=True, enforce_sorted=False)
-        x_feas, hn = self.rnn(x_feas)
-        x_feas, lengths = nn.utils.rnn.pad_packed_sequence(x_feas, batch_first=True, padding_value=0.0)
+    def forward(self, batch, device):
+        text_feas = self.text_model(batch, device)
+
+        x_feas = batch["audio_features"].to(device)
+
+        x_feas = nn.utils.rnn.pack_sequence(x_feas, enforce_sorted=False)
+        x_feas, _ = self.rnn(x_feas)
+        x_feas, _ = nn.utils.rnn.pad_packed_sequence(x_feas, batch_first=True, padding_value=0.0)
 
         # Concatenate on the last dimension
         x_comb = torch.cat((x_feas,text_feas),dim=2)
@@ -51,19 +63,8 @@ class RNNFFAudioTextModel(nn.Module):
 
         x_ff = self.output(x_ff)
 
-        return x_ff, lengths, hn
+        return x_ff
 
-    def get_sentence_prediction(self,model_output,lengths, device):
-        """
-        Returns the model output (which depends on the length),
-        for each sample in the batch.
+    def get_sentence_prediction(self, model_output):
 
-        select = lengths - torch.ones(lengths.shape, dtype=torch.long)
-
-        select = select.to(device)
-
-        indices = torch.unsqueeze(select, 1)
-        indices = torch.unsqueeze(indices, 2).repeat(1, 1, 2)
-        results = torch.gather(model_output, 1, indices).squeeze(1)
-        """
         return model_output
