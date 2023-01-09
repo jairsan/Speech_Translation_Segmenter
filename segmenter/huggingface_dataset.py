@@ -29,21 +29,22 @@ def get_datasets(train_text_file: str, dev_text_file: str, temperature: int,
 
             audio_dataset = audio_dataset.map(features_to_np, remove_columns="text")
 
-            #print(len(hf_dataset["train"]), len(audio_dataset["train"]))
-
             hf_dataset["train"] = concatenate_datasets([hf_dataset["train"], audio_dataset["train"]], axis=1)
             hf_dataset["dev"] = concatenate_datasets([hf_dataset["dev"], audio_dataset["dev"]], axis=1)
 
-
-    per_class_train_datasets = [hf_dataset["train"].filter(lambda sample: sample["label"] == i) for i in range(len(train_uniq_labels))]
+    per_class_train_datasets = [hf_dataset["train"].filter(lambda sample: sample["label"] == i) for i in
+                                range(len(train_uniq_labels))]
 
     # Compute class prob and apply temperature
-    per_class_pseudo_probs = [(len(ds)/len(hf_dataset["train"]))**(1/temperature) for ds in per_class_train_datasets]
+    per_class_pseudo_probs = [(len(ds) / len(hf_dataset["train"])) ** (1 / temperature) for ds in
+                              per_class_train_datasets]
     # Re-normalize
-    per_class_probs = [prob/sum(per_class_pseudo_probs) for prob in per_class_pseudo_probs]
+    per_class_probs = [prob / sum(per_class_pseudo_probs) for prob in per_class_pseudo_probs]
 
+    # Draw samples (with replacement) until both datasets have been exhausted once
     new_train_dataset = interleave_datasets(datasets=per_class_train_datasets, probabilities=per_class_probs,
-                                            )  # should we use stopping_strategy="all_exhausted"?
+                                            stopping_strategy="all_exhausted"
+                                            )
 
     hf_dataset["train"] = new_train_dataset
 

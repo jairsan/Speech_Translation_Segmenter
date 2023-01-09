@@ -10,5 +10,7 @@ setup(
     install_requires=[
         "torch==1.7.0",
         "scikit-learn==0.21.3",
-        "datasets==2.8.0"]
+        "numpy==1.23.3",
+        "datasets==2.8.0",
+        "transformers==4.24.0"]
 )

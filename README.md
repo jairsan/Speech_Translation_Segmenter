@@ -31,9 +31,9 @@ Standard MT system are usually trained with sequences of around 100-150 tokens. 
 ## Overview
 
 Main requirements:
-* Python 3.6
-* PyTorch 1.2
-* CUDA 10.0
+* Python 3.8
+* PyTorch 1.7
+* CUDA 11.0
 
 ## Quickstart
 1. Prepare your own data files using scripts/get_samples.py. You will need also need to define a vocabulary file.
