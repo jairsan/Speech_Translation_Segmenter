@@ -59,7 +59,7 @@ def eval_model(dev_dataloader, model, epoch, update):
 if __name__ == "__main__":
     start_prep = time.time()
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
     arguments.add_train_arguments(parser)
