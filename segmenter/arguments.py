@@ -9,6 +9,8 @@ def add_train_arguments(parser):
     parser.add_argument("--output_folder", type=str, help="Save model training here", required=True)
     parser.add_argument("--vocabulary", type=str, help="Vocabulary to be used by the network", required=True)
     parser.add_argument("--vocabulary_max_size", type=int, help="Use up to this number of vocabulary words", default=None)
+    parser.add_argument("--vocabulary_min_frequency", type=int, help="Words with a lower frequency than this will not"
+                                                                     "be included in the vocabulary.", default=0)
     parser.add_argument("--epochs", type=int, help="Train the model this number of epochs", default=40)
     parser.add_argument("--batch_size", type=int, help="Train batch size", default=256)
     parser.add_argument("--gradient_accumulation", type=int, default=1, help="Perform gradiend update every [gradient_accumulation] batches")
@@ -30,7 +32,8 @@ def add_train_arguments(parser):
 
 def add_general_arguments(parser):
     # Model parameters
-    parser.add_argument("--model_architecture", type=str, choices=list(STR_TO_CLASS.keys()), default=RNNFFTextModel.name)
+    parser.add_argument("--model_architecture", type=str, choices=list(STR_TO_CLASS.keys()),
+                        default=RNNFFTextModel.name)
     parser.add_argument("--sample_max_len", type=int, help="Total number of tokens on each sample.")
     parser.add_argument("--sample_window_size", type=int, help="Number of tokens in the future window of each sample. "
                                                                "A sample with max_len=l and window_size=s "

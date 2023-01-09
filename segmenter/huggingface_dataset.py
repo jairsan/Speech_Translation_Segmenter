@@ -8,6 +8,7 @@ def features_to_np(sample) -> Dict[str, List[List[float]]]:
 
 
 def get_datasets(train_text_file: str, dev_text_file: str, temperature: int,
+                 num_classes: int,
                  train_audio_features_file: str = None, dev_audio_features_file: str = None) -> Dataset:
     hf_dataset = load_dataset("text", data_files={"train": train_text_file, "dev": dev_text_file})
     hf_dataset = hf_dataset.map(lambda sample: {"words": " ".join(sample["text"].split()[1:])})
@@ -15,7 +16,7 @@ def get_datasets(train_text_file: str, dev_text_file: str, temperature: int,
     train_uniq_labels = hf_dataset["train"].unique("label")
     dev_uniq_labels = hf_dataset["dev"].unique("label")
 
-    assert len(train_uniq_labels) == len(dev_uniq_labels)
+    assert len(train_uniq_labels) == len(dev_uniq_labels) == num_classes
     assert [x == y for x, y in zip(sorted(train_uniq_labels), range(len(train_uniq_labels)))]
 
     hf_dataset.cast_column("label", ClassLabel(num_classes=len(train_uniq_labels)))

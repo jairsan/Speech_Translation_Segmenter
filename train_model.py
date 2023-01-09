@@ -12,8 +12,11 @@ import os
 import math
 import numpy as np
 import random
+import logging
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
 from transformers import default_data_collator, DataCollatorWithPadding
+
+logger = logging.getLogger(__name__)
 
 def save_model(model, args, vocabulary, model_str):
     if not os.path.exists(args.output_folder):
@@ -44,17 +47,19 @@ def eval_model(dev_dataloader, model, epoch, update):
             cost = loss(results, y)
             epoch_cost += cost.detach().cpu().numpy()
 
-        print("Epoch ", epoch, "update ", update, ", dev cost/batch: ", epoch_cost / len(dev_dataloader), sep="")
-        print("Dev Accuracy:", accuracy_score(true_l, predicted_l))
+        logger.info(f"Epoch  {epoch}, update  {update},  dev cost/batch:  {epoch_cost / len(dev_dataloader)}")
+        logger.info(f"Dev Accuracy:{accuracy_score(true_l, predicted_l)}")
         precision, recall, f1, _ = precision_recall_fscore_support(true_l, predicted_l, average='macro')
-        print("Dev precision, Recall, F1 (Macro): ", precision, recall, f1)
-        print(classification_report(true_l, predicted_l))
+        logger.info(f"Dev precision, Recall, F1 (Macro): {precision} {recall} {f1}")
+        logger.info(classification_report(true_l, predicted_l))
 
         return f1
 
 
 if __name__ == "__main__":
     start_prep = time.time()
+
+    logging.basicConfig(level=logging.DEBUG)
 
     parser = argparse.ArgumentParser()
     arguments.add_train_arguments(parser)
@@ -75,7 +80,9 @@ if __name__ == "__main__":
     dataset_workers = 2
 
     vocabulary = vocab.VocabDictionary()
-    vocabulary.create_from_count_file(known_args.vocabulary, known_args.vocabulary_max_size)
+    vocabulary.create_from_count_file(path=known_args.vocabulary,
+                                      vocab_max_size=known_args.vocabulary_max_size,
+                                      word_min_frequency=known_args.vocabulary_min_frequency)
 
     model_class, requires_vocab = utils.model_picker(known_args)
     model_class.add_model_args(model_arguments_parser)
@@ -107,9 +114,6 @@ if __name__ == "__main__":
                                                                patience=args.lr_reduce_patience, verbose=True)
     loss = torch.nn.CrossEntropyLoss()
 
-    end_prep = time.time()
-    print("Model preparation took: ", str(end_prep - start_prep), " seconds.")
-
     best_result = -math.inf
     best_epoch = -math.inf
 
@@ -117,10 +121,10 @@ if __name__ == "__main__":
         hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
                                    temperature=args.sampling_temperature,
                                    train_audio_features_file=args.train_audio_features_corpus,
-                                   dev_audio_features_file=args.dev_audio_features_corpus)
+                                   dev_audio_features_file=args.dev_audio_features_corpus, num_classes=args.num_classes)
     else:
         hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
-                                   temperature=args.sampling_temperature)
+                                   temperature=args.sampling_temperature, num_classes=args.n_classes)
 
     if isinstance(model, HuggingFaceSegmenterModel):
         hf_datasets = hf_datasets.map(model.apply_tokenizer).remove_columns(column_names="words")
@@ -141,6 +145,9 @@ if __name__ == "__main__":
 
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
                                      shuffle=False, drop_last=False, collate_fn=collater)
+
+    end_prep = time.time()
+    logger.info(f"Training preparation took {str(end_prep - start_prep)} seconds.")
 
     update = 0
     for epoch in range(1, args.epochs):
@@ -169,9 +176,8 @@ if __name__ == "__main__":
                 curr_time = time.time()
                 diff_t = curr_time - last_time
                 last_time = curr_time
-                print("Epoch ", epoch, ", update ", update, ", cost: ",
-                      cost.detach().cpu().numpy(), ", batches per second: ",
-                      str(float(args.log_every) / float(diff_t)), sep="")
+                logger.debug(f"Epoch {epoch} update {update} cost: {cost.detach().cpu().numpy()}, batches per second: "
+                             f"{str(float(args.log_every) / float(diff_t))}")
             if update % args.gradient_accumulation == 0:
                 optimizer.step()
                 optimizer.zero_grad()
@@ -180,7 +186,7 @@ if __name__ == "__main__":
                 _ = eval_model(dev_dataloader, model, epoch, update)
                 save_model(model, args, vocabulary, str(epoch) + "." + str(update))
 
-        print("Epoch ", epoch, ", train cost/batch: ", epoch_cost / len(train_dataloader), sep="")
+        logger.info(f"Epoch {epoch}, train cost/batch: {epoch_cost / len(train_dataloader)}")
 
         f1 = eval_model(dev_dataloader, model, epoch, update)
 
@@ -196,5 +202,5 @@ if __name__ == "__main__":
         if args.checkpoint_interval > 0 and epoch % args.checkpoint_interval == 0:
             save_model(model, args, vocabulary, str(epoch))
 
-    print("Training finished.")
-    print("Best checkpoint F1:", best_result, ", achieved at epoch:", best_epoch)
+    logger.info("Training finished.")
+    logger.info(f"Best checkpoint F1: {best_result}, achieved at epoch: {best_epoch}")
