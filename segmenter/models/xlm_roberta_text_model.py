@@ -21,9 +21,11 @@ class XLMRobertaTextModel(HuggingFaceSegmenterModel):
 
     def apply_tokenizer(self, sample):
         new_l = ['nocontext' if x == "</s>" else x for x in sample["words"].split()]
-        a = new_l[:-self.window_size] + ["</s>"] + new_l[-self.window_size:]
-        text = " ".join(a)
-        encoded_inputs = self.tokenizer(text)
+
+        text_history = " ".join(new_l[:-self.window_size])
+        text_future = " ".join(new_l[-self.window_size:])
+        encoded_inputs = self.tokenizer(text=text_history, text_pair=text_future, add_special_tokens=True)
+
         return encoded_inputs
 
     def forward(self, batch, device):

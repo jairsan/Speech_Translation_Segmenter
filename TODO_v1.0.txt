@@ -1,0 +1,3 @@
+- New plug-and-play inference code for SegFree
+- General cleaning
+- Use required vocab to set vocab to None if necessary
