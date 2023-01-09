@@ -13,5 +13,10 @@ def add_rnn_arguments(parser):
     parser.add_argument("--rnn_layer_size", type=int, default=256, help="Hidden size of the RNN layers")
     parser.add_argument("--embedding_size", type=int, default=256, help="Size of the embedding")
 
+
 def add_common_arguments(parser):
     parser.add_argument("--dropout", type=float, default=0.3)
+
+
+def add_transformer_arch_name(parser):
+    parser.add_argument("--transformer_model_name", type=str)

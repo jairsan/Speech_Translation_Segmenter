@@ -1,9 +1,7 @@
 from segmenter import arguments, vocab, utils
 from segmenter.huggingface_dataset import get_datasets
 from segmenter.utils import load_text_model
-from segmenter.models.segmenter_model import FeatureExtractorSegmenterModel
-from segmenter.models.bert_text_model import BERTTextModel
-from segmenter.models.xlm_roberta_text_model import XLMRobertaTextModel
+from segmenter.models.segmenter_model import FeatureExtractorSegmenterModel, HuggingFaceSegmenterModel
 
 import argparse
 import torch
@@ -15,7 +13,7 @@ import math
 import numpy as np
 import random
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
-from transformers import default_data_collator
+from transformers import default_data_collator, DataCollatorWithPadding
 
 def save_model(model, args, vocabulary, model_str):
     if not os.path.exists(args.output_folder):
@@ -76,15 +74,8 @@ if __name__ == "__main__":
 
     dataset_workers = 2
 
-    if known_args.transformer_model_name is None:
-        vocabulary = vocab.VocabDictionary()
-        vocabulary.create_from_count_file(known_args.vocabulary, known_args.vocabulary_max_size)
-    else:
-        vocabulary = None
-
-    if known_args.model_architecture != BERTTextModel and known_args.model_architecture != XLMRobertaTextModel and known_args.transformer_model_name is not None:
-        # Cant use transformer model name if we are not using transformer
-        raise Exception
+    vocabulary = vocab.VocabDictionary()
+    vocabulary.create_from_count_file(known_args.vocabulary, known_args.vocabulary_max_size)
 
     model_class, requires_vocab = utils.model_picker(known_args)
     model_class.add_model_args(model_arguments_parser)
@@ -130,23 +121,26 @@ if __name__ == "__main__":
     else:
         hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
                                    temperature=args.sampling_temperature)
-    if args.transformer_model_name is not None:
-        pass
+
+    if isinstance(model, HuggingFaceSegmenterModel):
+        hf_datasets = hf_datasets.map(model.apply_tokenizer).remove_columns(column_names="words")
+        collater = DataCollatorWithPadding(tokenizer=model.tokenizer)
     else:
         def text_to_idx(sample):
             return {"idx": [vocabulary.get_index(token) for token in sample["words"].split()]}
 
 
-        hf_datasets = hf_datasets.map(text_to_idx).remove_columns(column_names="words")
+        hf_datasets = hf_datasets.map(text_to_idx)
+        collater = default_data_collator
 
     train_dataset = hf_datasets["train"]
     dev_dataset = hf_datasets["dev"]
 
     train_dataloader = data.DataLoader(train_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
-                                       shuffle=True, collate_fn=default_data_collator)
+                                       shuffle=True, collate_fn=collater)
 
     dev_dataloader = data.DataLoader(dev_dataset, num_workers=dataset_workers, batch_size=args.batch_size,
-                                     shuffle=False, drop_last=False, collate_fn=default_data_collator)
+                                     shuffle=False, drop_last=False, collate_fn=collater)
 
     update = 0
     for epoch in range(1, args.epochs):

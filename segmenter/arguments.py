@@ -31,7 +31,6 @@ def add_train_arguments(parser):
 def add_general_arguments(parser):
     # Model parameters
     parser.add_argument("--model_architecture", type=str, choices=list(STR_TO_CLASS.keys()), default=RNNFFTextModel.name)
-    parser.add_argument("--transformer_model_name", type=str, default=None)
     parser.add_argument("--sample_max_len", type=int, help="Total number of tokens on each sample.")
     parser.add_argument("--sample_window_size", type=int, help="Number of tokens in the future window of each sample. "
                                                                "A sample with max_len=l and window_size=s "

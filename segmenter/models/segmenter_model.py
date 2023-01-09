@@ -18,3 +18,8 @@ class FeatureExtractorSegmenterModel(SegmenterModel):
 
         """
         raise NotImplementedError
+
+
+class HuggingFaceSegmenterModel(SegmenterModel):
+    def apply_tokenizer(self, sample) -> Dict:
+        raise NotImplementedError
