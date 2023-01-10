@@ -4,12 +4,12 @@ window=4
 rm -r pre-trained_text_model
 
 python $PWD/../train_model.py \
+--model_architecture xlm-roberta \
+--transformer_model_name xlm-roberta-base \
 --train_corpus $PWD/train.ML$len.WS$window.txt \
 --dev_corpus $PWD/dev.ML$len.WS$window.txt \
 --output_folder pre-trained_text_model \
 --vocabulary $PWD/train.vocab.txt \
---model_architecture xlm-roberta \
---transformer_model_name xlm-roberta-base \
 --sampling_temperature 100 \
 --batch_size 64 \
 --adam_b1 0.9 \
