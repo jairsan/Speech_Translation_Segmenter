@@ -24,6 +24,21 @@ class DsSegmenter:
         self.consecutive_no_split: int = 0
 
     def step(self, new_word: str) -> Tuple[Optional[str], bool]:
+        """
+        Input:
+            - new_word: Word given to the model. It will be processed once enough context is available.
+
+        Output: (output_word, is_end_of_segment)
+            - output_word: Word for which we have taken a decision. This is different from new_word if future_window> 0.
+                Can be None if we don't have enough future words
+            - is_end_of_segment: If True, output_word is the word that ends the segment i.e. typically we would
+                then append /n
+
+        Main method. Should be called each time a new_word is read.
+
+        Note that when the whole stream has been read, there are some unprocesed words remaining
+        in self.unprocessed_words
+        """
         self.unprocessed_words.append(new_word)
 
         if len(self.unprocessed_words) >= self.sample_window_size + 1:

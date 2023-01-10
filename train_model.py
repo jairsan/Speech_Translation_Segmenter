@@ -69,8 +69,7 @@ if __name__ == "__main__":
 
     model_arguments_parser = argparse.ArgumentParser()
 
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     os.environ['PYTHONHASHSEED'] = str(known_args.seed)
     random.seed(known_args.seed)
