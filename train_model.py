@@ -1,3 +1,5 @@
+import datasets.utils.logging
+
 from segmenter import arguments, vocab, utils
 from segmenter.huggingface_dataset import get_datasets
 from segmenter.utils import load_text_model
@@ -60,6 +62,7 @@ if __name__ == "__main__":
     start_prep = time.time()
 
     logging.basicConfig(level=logging.INFO)
+    datasets.utils.disable_progress_bar()
 
     parser = argparse.ArgumentParser()
     arguments.add_train_arguments(parser)
