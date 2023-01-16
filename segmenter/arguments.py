@@ -24,6 +24,7 @@ def add_train_arguments(parser):
     parser.add_argument("--lr_schedule", choices=['fixed', 'reduce_on_plateau'], default="reduce_on_plateau")
     parser.add_argument("--lr_reduce_patience", type=int, default=10)
     parser.add_argument("--lr_reduce_factor", type=float, default=0.5)
+    parser.add_argument("--amp", action='store_true', help="If set, use torch.amp to speed up training by using FP16")
     parser.add_argument("--adam_b1", type=float, default=0.9)
     parser.add_argument("--adam_b2", type=float, default=0.9999)
     parser.add_argument("--adam_eps", type=float, default=1e-08)
@@ -39,15 +40,3 @@ def add_general_arguments(parser):
                                                                "A sample with max_len=l and window_size=s "
                                                                "has (l - s - 1) previous history tokens. ")
     parser.add_argument("--n_classes", type=int, default=2, help="Number of classification targets")
-
-
-def add_infer_arguments(parser):
-    parser.add_argument("--model_path", type=str, help="Load this model", required=True)
-    parser.add_argument("--beam", type=int, help="Use beam search, with beam of size b", default=1 )
-    parser.add_argument("--input_format",  choices=['sample_file', 'list_of_text_files'], help="Input format for the decoding process. ", required=True)
-    parser.add_argument("--file", type=str, help="Infer from this sample file")
-    parser.add_argument("--input_file_list", type=str, help="Infer from list of files.")
-    parser.add_argument("--input_audio_file_list", type=str, help="Infer from list of files containing audio features.")
-    parser.add_argument("--debug", action='store_true', help="Activate debug mode")
-    parser.add_argument("--segment_max_size", type=int, default=99999, help="Force split for segments longer than [segment_max_size]")
-

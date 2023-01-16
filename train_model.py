@@ -151,6 +151,11 @@ if __name__ == "__main__":
     end_prep = time.time()
     logger.info(f"Training preparation took {str(end_prep - start_prep)} seconds.")
 
+    if args.amp:
+        if not torch.cuda.is_available():
+            raise Exception
+        scaler = torch.cuda.amp.GradScaler()
+
     update = 0
     for epoch in range(1, args.epochs):
 
@@ -163,16 +168,27 @@ if __name__ == "__main__":
 
         for batch in train_dataloader:
 
-            model_output = model.forward(batch, device)
+            with torch.cuda.amp.autocast(enabled=args.amp):
+                model_output = model.forward(batch, device)
+                results = model.get_sentence_prediction(model_output)
+                cost = loss(results, batch["labels"].to(device))
 
-            results = model.get_sentence_prediction(model_output)
-
-            cost = loss(results, batch["labels"].to(device))
-
-            cost.backward()
+            if args.amp:
+                scaler.scale(loss).backward()
+            else:
+                cost.backward()
 
             epoch_cost += cost.detach().cpu().numpy()
             update += 1
+
+            if update % args.gradient_accumulation == 0:
+                if args.amp:
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.step()
+
+                optimizer.zero_grad()
 
             if update % args.log_every == 0:
                 curr_time = time.time()
@@ -180,9 +196,7 @@ if __name__ == "__main__":
                 last_time = curr_time
                 logger.debug(f"Epoch {epoch} update {update} cost: {cost.detach().cpu().numpy()}, batches per second: "
                              f"{str(float(args.log_every) / float(diff_t))}")
-            if update % args.gradient_accumulation == 0:
-                optimizer.step()
-                optimizer.zero_grad()
+
 
             if args.checkpoint_every_n_updates is not None and (update + 1) % args.checkpoint_every_n_updates == 0:
                 _ = eval_model(dev_dataloader, model, epoch, update)
