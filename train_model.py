@@ -174,7 +174,7 @@ if __name__ == "__main__":
                 cost = loss(results, batch["labels"].to(device))
 
             if args.amp:
-                scaler.scale(loss).backward()
+                scaler.scale(cost).backward()
             else:
                 cost.backward()
 
