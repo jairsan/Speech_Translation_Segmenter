@@ -60,7 +60,7 @@ class DsSegmenter:
                     batch = self.segmenter_model.apply_tokenizer(batch)
                     batch = {key: torch.tensor(value).view(1, -1) for key, value in batch.items()}
                 else:
-                    batch = {"idx": [self.segmenter_vocab_dictionary.get_index(token) for token in batch["words"].split()]}
+                    batch = {"idx": torch.tensor([self.segmenter_vocab_dictionary.get_index(token) for token in batch["words"].split()]).view(1, -1)}
 
                 model_output = self.segmenter_model.forward(batch, device=torch.device('cuda'))
                 sentence_prediction = self.segmenter_model.get_sentence_prediction(model_output)
