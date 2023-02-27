@@ -171,7 +171,9 @@ if __name__ == "__main__":
             with torch.cuda.amp.autocast(enabled=args.amp):
                 model_output = model.forward(batch, device)
                 results = model.get_sentence_prediction(model_output)
-                cost = loss(results, batch["labels"].to(device))
+                # Scale loss by gradient accumulation steps, so that the mean is properly computed over the virtual
+                # batch.
+                cost = loss(results, batch["labels"].to(device)) / args.gradient_accumulation
 
             if args.amp:
                 scaler.scale(cost).backward()
@@ -196,7 +198,6 @@ if __name__ == "__main__":
                 last_time = curr_time
                 logger.debug(f"Epoch {epoch} update {update} cost: {cost.detach().cpu().numpy()}, batches per second: "
                              f"{str(float(args.log_every) / float(diff_t))}")
-
 
             if args.checkpoint_every_n_updates is not None and (update + 1) % args.checkpoint_every_n_updates == 0:
                 _ = eval_model(dev_dataloader, model, epoch, update)
