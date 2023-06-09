@@ -1,9 +1,0 @@
-To do:
-- General cleaning & documentation
-- Use required vocab to set vocab to None if necessary
-
-Future v3.0:
-- Think if we should remove </s> when using pre-trained models
-
-Things not to do:
-- Don't add DSSegmenter for Audio, probably a waste of time

@@ -29,8 +29,7 @@ Standard MT system are usually trained with sequences of around 100-150 tokens. 
 
 
 ## Overview
-
-Main requirements:
+The code has been tested with:
 * Python 3.8
 * PyTorch 1.7
 * CUDA 11.0
@@ -38,10 +37,11 @@ Main requirements:
 ## Quickstart
 1. Prepare your own data files using scripts/get_samples.py. You will need also need to define a vocabulary file.
 2. Train a text model using train_text_model.py.
-3. (Optional) Train an audio model with train_audio_model_from_pretrained_text.py. You will need a trained text model, and the audio data files. They can be produced with scripts/get_samples_with_audio_feas.py.
-4. Segment the sentences, using decode_text_model.py or decode_audio_model.py
+3. (Optional) Train an audio model. You will need a trained text model, and the audio data files. They can be produced with `scripts/get_samples_with_audio_feas.py`.
+4. Segment the sentences, using `segment_text.py`
 
-An example of the entire process for the Europarl-ST en-fr corpus is shown in the examples/ folder.
+An example of the entire process for the Europarl-ST en-fr corpus is shown in the `examples/` folder.
+
 
 ## Training Data preparation
 An specific file must be prepared for each combination of HISTORY_LENGTH and FUTURE_WINDOW_SIZE.
@@ -66,86 +66,33 @@ An audio features datafile consists in N lines, one for sample. It contains [HIS
 
 The acoustic features were extracted using the TLK software. Feel free to use any other ASR hybrid model toolkit, or use those features that might make more sense for your specific application. Remember that they must be aligned to words.
 
-## Model Training
-
-Training should be self-explanatory. For training a text model using the default configuration, you can do something like:
-
-```
-len=$(($HISTORY_LENGTH+1+$FUTURE_WINDOW_SIZE))
-python train_text_model.py \
---train_corpus train.ML$len.WS$FUTURE_WINDOW_SIZE.txt \
---dev_corpus dev.ML$len.WS$FUTURE_WINDOW_SIZE.txt \
---output_folder text_model \
---vocabulary train.vocab.txt \
---model_architecture ff-text \
---sample_max_len $len \
---sample_window_size $FUTURE_WINDOW_SIZE
-```
-
-Then, to train an audio model on top of a pre-trained text model,
-
-```
-python train_audio_model_from_pretrained_text.py \
---train_corpus  train.ML$len.WS$FUTURE_WINDOW_SIZE.txt \
---dev_corpus dev.ML$len.WS$FUTURE_WINDOW_SIZE.txt \
---train_audio_features_corpus train.ML$len.WS$FUTURE_WINDOW_SIZE.feas.txt \
---dev_audio_features_corpus dev.ML$len.WS$FUTURE_WINDOW_SIZE.feas.txt \
---model_path text_model/model.best.pt \
---embedding_size 3 \
---output_folder audio_model \
---vocabulary train.vocab.txt \
---sample_max_len $len \
---sample_window_size $window \
---model_architecture ff-audio-text-copy-feas
-```
-
-It is required to provide --embedding_size [ACOUSTIC_FEATURES_DIM], which is 3 in our case.
-
-The "ff-audio-text-copy-feas" architecture corresponds to the "Audio w/o RNN" on the paper. You can also train "Audio w/ RNN" models using --model_architecture ff-audio-text and --audio_rnn_layer_size [int].
-
 ## Segmentation
 
-Decoding with a text model is very simple. You will provide a list file, each line of that file will contain the file path to a file whose contests you want to split.
+Decoding with a text model is very simple. The `DsSegmenter` class (`segmenter/ds_segmenter.py`) is a wrapper over
+the segmentation model, and implements the `step()` method:
+```
+    Input:
+        - new_word: Word given to the model. It will be processed once enough context is available.
+    Output: (output_word, is_end_of_segment)
+        - output_word: Word for which we have taken a decision. This is different from new_word if future_window> 0.
+            Can be None if we don't have enough future words
+        - is_end_of_segment: If True, output_word is the word that ends the segment i.e. typically we would
+            then append /n
+```
+
+One would typically integrate this class into their own streaming server (i.e. GRPC). If you are only interested in using
+this for experimentation, the `segment_text.py` script can be used.
 
 ```
-ls test/ > test_files.lst
-
-python decode_text_model.py \
-    --input_format list_of_text_files \
-    --input_file_list test_files.lst  \
-    --model_path text_model/model.best.pt \
-    --sample_max_len $len \
-    --sample_window_size $FUTURE_WINDOW_SIZE
+python segment_text.py \
+    --input_file raw_text.txt \
+    --segmenter text_model/model.best.pt 
 ```
 
 The contents of each file are treated as a stream, so preexisting line breaks are ignored, and the output is segmented into lines according to the best hypothesis of the model.
 
-Decoding with an audio model follows the same principles, but now you also have to provide the file containing the paths of the audio feature files. Each audio feature file will contain N lines, N being the number of words of the corresponding text file. Each line provides white-space separated features for the corresponding word.
-
-```
-15 0 1
-27 1 0
-3 0 0
-17 0 0
-53 0 1
-56 1 0
-42 0 6
-25 6 0
-37 0 1
-10 1 0
-14 0 0
-24 0 0
-12 0 0
-10 0 0
-19 0 0
-```
-
-```
- python decode_audio_model.py \
-     --input_format list_of_text_files \
-     --input_file_list test_files.lst  \
-     --input_audio_file_list test_files.features.lst \
-     --model_path audio_model/model.best.pt \
-     --sample_max_len $len \
-     --sample_window_size $FUTURE_WINDOW_SIZE
- ```
+## Version 1.0
+I have continued working on this codebase after the publication, as it has been heavily used for many
+experiments during my PhD. I have decided to release an updated 1.0 version, which contains many improvements,
+specially with regards to code quality, which should be much easier to use. There is now code for using pre-trained RoBERTa models
+as a drop-in replacement for the RNN, and this works quite well.

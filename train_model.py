@@ -123,7 +123,7 @@ if __name__ == "__main__":
         hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
                                    temperature=args.sampling_temperature,
                                    train_audio_features_file=args.train_audio_features_corpus,
-                                   dev_audio_features_file=args.dev_audio_features_corpus, num_classes=args.num_classes)
+                                   dev_audio_features_file=args.dev_audio_features_corpus, num_classes=args.n_classes)
     else:
         hf_datasets = get_datasets(train_text_file=args.train_corpus, dev_text_file=args.dev_corpus,
                                    temperature=args.sampling_temperature, num_classes=args.n_classes)
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         scaler = torch.cuda.amp.GradScaler()
 
     update = 0
-    for epoch in range(1, args.epochs):
+    for epoch in range(1, args.epochs + 1):
 
         last_time = time.time()
 
